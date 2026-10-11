@@ -35,13 +35,13 @@ try {
         [IO.File]::WriteAllText("$root/bundle/SHA256SUMS", "$hash  nodi-windows-amd64.exe`n", [Text.UTF8Encoding]::new($false))
         & "$PSScriptRoot/install-windows.ps1" -BundleDirectory "$root/bundle" -InstallDirectory "$root/bin" -NoPath -NoCompletion
         if ($LASTEXITCODE -ne 0) { throw 'Fixture install failed' }
-        "y`ny" | & "$root/bin/nodi.exe" setup
+        "y`ny" | & "$root/bin/nodi.exe" setup --completion
         if ($LASTEXITCODE -ne 0) { throw 'Setup failed' }
         $configured = @{}
         foreach ($profile in $profiles) { $configured[$profile.Path] = [Convert]::ToBase64String([IO.File]::ReadAllBytes($profile.Path)) }
         # Re-running the default installer calls setup and must not prompt or duplicate.
         & "$PSScriptRoot/install-windows.ps1" -BundleDirectory "$root/bundle" -InstallDirectory "$root/bin" -NoPath
-        & "$root/bin/nodi.exe" setup --check
+        & "$root/bin/nodi.exe" setup --completion --check
         foreach ($profile in $profiles) {
             if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($profile.Path)) -cne $configured[$profile.Path]) { throw 'Installer/check changed configured profile' }
         }
@@ -49,7 +49,7 @@ try {
     $verify = @'
 $ErrorActionPreference = 'Stop'
 if ($env:NODI_STARTUP_EXPECT_SETTING -and $global:NodiUserSetting -cne 'preserved') { throw 'Existing profile setting was lost' }
-foreach ($case in @(@('nodi pub',@('publish')),@('nodi se',@('setup')),@('nodi get nod',@('nodi-ux-1')),@('nodi get nodi-ux-1 --version 0.1.',@('0.1.0','0.1.1')))) {
+foreach ($case in @(@('nodi pub',@('publish')),@('nodi se',@('send','setup')),@('nodi get nod',@('nodi-ux-1')),@('nodi get nodi-ux-1 --version 0.1.',@('0.1.0','0.1.1')))) {
     $actual = @((TabExpansion2 -inputScript $case[0] -cursorColumn $case[0].Length).CompletionMatches | ForEach-Object CompletionText)
     foreach ($expected in $case[1]) {
         if ($actual -notcontains $expected) {

@@ -179,7 +179,7 @@ func TestSetupRejectsUnknownOptionsAndCompletes(t *testing.T) {
 	for _, tt := range []struct {
 		words []string
 		want  string
-	}{{[]string{"se"}, "setup\n"}, {[]string{"setup", "--c"}, "--check\n"}} {
+	}{{[]string{"se"}, "send\nsetup\n"}, {[]string{"setup", "--c"}, "--check\n--completion\n"}} {
 		out.Reset()
 		if err := a.Run(context.Background(), append([]string{"__complete"}, tt.words...)); err != nil || out.String() != tt.want {
 			t.Fatal(out.String(), err)

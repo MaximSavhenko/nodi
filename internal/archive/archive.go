@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"nodi/internal/config"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
@@ -17,8 +18,6 @@ import (
 	"strings"
 	"time"
 )
-
-var formats = map[string]bool{".dxf": true, ".pdf": true, ".step": true, ".stp": true, ".iges": true, ".igs": true, ".stl": true, ".3mf": true, ".svg": true, ".dwg": true}
 
 type contextReader struct {
 	ctx context.Context
@@ -285,11 +284,35 @@ func sourceNames(ctx context.Context, source string, requireFiles bool) (string,
 	if e != nil {
 		return "", nil, e
 	}
-	if !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
-		return "", nil, fmt.Errorf("source must be a real directory")
+	if root.Mode()&os.ModeSymlink != 0 || (!root.IsDir() && !root.Mode().IsRegular()) {
+		return "", nil, fmt.Errorf("source must be a regular file or real directory")
 	}
-	if e = CheckParents(source); e != nil {
+	parent := source
+	if !root.IsDir() {
+		parent = filepath.Dir(source)
+	}
+	if e = CheckParents(parent); e != nil {
 		return "", nil, e
+	}
+	configDir, e := config.Dir()
+	if e != nil {
+		return "", nil, e
+	}
+	if protectedPath(source, configDir) {
+		return "", nil, fmt.Errorf("Nodi configuration and credentials cannot be sent")
+	}
+	if excludedName(filepath.Base(source)) {
+		return "", nil, fmt.Errorf("source is excluded by the file policy: %s", filepath.Base(source))
+	}
+	if !root.IsDir() {
+		name := filepath.Base(source)
+		if excludedName(name) {
+			return "", nil, fmt.Errorf("source is excluded by the file policy: %s", name)
+		}
+		if e = model.SafePath(name); e != nil {
+			return "", nil, e
+		}
+		return parent, []string{name}, nil
 	}
 	var names []string
 	e = filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
@@ -302,20 +325,20 @@ func sourceNames(ctx context.Context, source string, requireFiles bool) (string,
 		if p == source {
 			return nil
 		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("symbolic links are not allowed: %s", p)
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") {
+		if excludedName(d.Name()) || protectedPath(p, configDir) {
+			if d.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !formats[strings.ToLower(filepath.Ext(d.Name()))] {
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symbolic links are not allowed: %s", p)
+		}
+		if d.IsDir() {
 			return nil
 		}
-		if strings.HasPrefix(d.Name(), ".") {
-			return nil
+		if !d.Type().IsRegular() {
+			return fmt.Errorf("not a regular file: %s", p)
 		}
 		rel, e := filepath.Rel(source, p)
 		if e != nil {
@@ -335,8 +358,32 @@ func sourceNames(ctx context.Context, source string, requireFiles bool) (string,
 		return "", nil, e
 	}
 	if len(names) == 0 && requireFiles {
-		return "", nil, fmt.Errorf("no supported manufacturing files (DXF, PDF, STEP, IGES, STL, 3MF, SVG, DWG)")
+		return "", nil, fmt.Errorf("no transferable files after excluding hidden, credential and service files")
 	}
 	sort.Strings(names)
 	return source, names, nil
+}
+
+func protectedPath(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// Conservative name policy, not a content-based secret detector. Users must
+// select a delivery folder; secrets disguised as ordinary documents cannot be
+// recognized reliably. These exclusions also apply to explicitly sent files.
+func excludedName(name string) bool {
+	n := strings.ToLower(name)
+	if strings.HasPrefix(n, ".") || strings.Contains(n, "credential") || strings.Contains(n, "secret") || strings.HasPrefix(n, "token.") || strings.Contains(n, "-token") || strings.Contains(n, "_token") || strings.HasPrefix(n, "password") || strings.HasPrefix(n, "id_rsa") || strings.HasPrefix(n, "id_ed25519") || strings.HasPrefix(n, "id_ecdsa") {
+		return true
+	}
+	switch n {
+	case "node_modules", "__pycache__", "venv", "env", "build", "dist", "target", "coverage", "logs", "thumbs.db", "desktop.ini", "config.json", "auth.json", "credential", "token", "tokens.json":
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(n)) {
+	case ".credential", ".pem", ".key", ".p12", ".pfx", ".keystore", ".kdbx", ".log", ".tmp", ".bak":
+		return true
+	}
+	return false
 }

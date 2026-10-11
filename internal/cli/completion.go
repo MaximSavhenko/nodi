@@ -34,7 +34,8 @@ Enable in this session (no profile changes):
   bash: source <(nodi completion bash)
   PowerShell: nodi completion powershell | Out-String | Invoke-Expression
 Homebrew installs zsh/bash completion files automatically.
-For persistent setup, run nodi setup (asks before profile edits); nodi setup --check is read-only.
+For persistent completion, run nodi setup --completion (asks before profile edits).
+nodi setup --completion --check is read-only; nodi setup configures storage access.
 Dynamic suggestions use saved credentials, a 1.5 second timeout and a 60 second cache.
 Offline suggestions may be stale. No credentials prompt is ever shown on Tab.`)
 		return nil
@@ -146,8 +147,8 @@ func (a *App) remoteSuggestions(ctx context.Context, write, useBinding bool) []s
 }
 
 var commandFlags = map[string][]string{
-	"setup": {"--check"},
-	"get":   {"--version", "--output"}, "publish": {"--version", "--status", "--description", "--metadata", "--minor", "--major"},
+	"setup": {"--check", "--repo", "--write", "--completion"},
+	"get":   {"--version", "--output"}, "publish": {"--version", "--status", "--draft", "--description", "--metadata", "--minor", "--major"},
 	"list": {"--all"}, "info": {"--all"}, "config": {"--repo"}, "init": {"--repo"}, "auth": {"--write"},
 }
 var valueFlags = map[string]bool{"--version": true, "--output": true, "--status": true, "--description": true, "--metadata": true, "--repo": true}
@@ -174,7 +175,7 @@ func (a *App) complete(ctx context.Context, words []string) {
 		}
 	}
 	if len(before) == 0 {
-		emit([]string{"version", "help", "completion", "setup", "init", "status", "publish", "get", "list", "info", "open", "config", "auth", "-v", "--version", "--help"}, cur)
+		emit([]string{"version", "help", "completion", "setup", "init", "status", "publish", "send", "get", "list", "info", "open", "config", "auth", "-v", "--version", "--help"}, cur)
 		return
 	}
 	positionals := []string{}
@@ -244,6 +245,10 @@ func (a *App) complete(ctx context.Context, words []string) {
 		return
 	}
 	switch cmd {
+	case "send":
+		if len(positionals) == 0 {
+			fmt.Fprintln(a.Out, ":files")
+		}
 	case "auth":
 		if len(positionals) == 0 {
 			emit([]string{"login", "logout"}, cur)

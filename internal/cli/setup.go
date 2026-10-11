@@ -31,11 +31,7 @@ type completionSetup struct {
 	nativeConfigured bool
 }
 
-func (a *App) setup(ctx context.Context, args []string) error {
-	check := len(args) == 1 && args[0] == "--check"
-	if len(args) != 0 && !check {
-		return fmt.Errorf("use nodi setup [--check]")
-	}
+func (a *App) setupCompletion(ctx context.Context, check bool) error {
 	plans, err := completionSetups(ctx)
 	if err != nil {
 		return err

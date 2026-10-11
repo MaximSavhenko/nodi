@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -165,7 +164,24 @@ func ReadToken(in io.Reader) (string, error) {
 			return hiddenToken(f)
 		}
 	}
-	b, e := bufio.NewReader(io.LimitReader(in, 4097)).ReadString('\n')
+	// Avoid read-ahead: setup may have more consent input after the token.
+	var input strings.Builder
+	one := make([]byte, 1)
+	var e error
+	for input.Len() <= 4096 {
+		var n int
+		n, e = in.Read(one)
+		if n > 0 {
+			input.WriteByte(one[0])
+			if one[0] == '\n' {
+				break
+			}
+		}
+		if e != nil {
+			break
+		}
+	}
+	b := input.String()
 	if e != nil && e != io.EOF {
 		return "", e
 	}

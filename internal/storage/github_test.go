@@ -35,6 +35,68 @@ func TestAPIErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestPublicationMustVerifyFinalStateAndUploadedBytes(t *testing.T) {
+	for _, mode := range []string{"corrupt upload", "lying PATCH", "final GET failure"} {
+		t.Run(mode, func(t *testing.T) {
+			mock := testutil.NewGitHub()
+			defer mock.Close()
+			mock.Configure(func(g *testutil.GitHub) {
+				switch mode {
+				case "corrupt upload":
+					g.CorruptArchive = true
+				case "lying PATCH":
+					g.MisreportFinalize = true
+				case "final GET failure":
+					g.FailFinalRead = true
+				}
+			})
+			g, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())
+			source := t.TempDir()
+			os.WriteFile(filepath.Join(source, "file.txt"), []byte("fixture"), 0644)
+			m, z, e := archive.Prepare(context.Background(), source, "demo", "0.1.0", "released", "", nil)
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer os.Remove(z)
+			if e = g.Publish(context.Background(), m, z); e == nil {
+				t.Fatal("false success", mode)
+			}
+			if mode == "corrupt upload" {
+				mock.Configure(func(g *testutil.GitHub) {
+					for _, r := range g.Requests {
+						if strings.HasPrefix(r, "PATCH") {
+							t.Fatal("corrupt upload finalized")
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestAccessPermissionProbeDoesNotCreateObjects(t *testing.T) {
+	mock := testutil.NewGitHub()
+	defer mock.Close()
+	for _, write := range []bool{false, true} {
+		token := "read-test"
+		if write {
+			token = "write-test"
+		}
+		g, _ := NewGitHubWithClient("owner/private", token, mock.Server.URL, mock.Server.URL, mock.Server.Client())
+		if e := g.CheckAccess(context.Background(), write); e != nil {
+			t.Fatal(e)
+		}
+		state, e := g.State(context.Background(), "demo")
+		if e != nil || state.Version != "" {
+			t.Fatal(state, e)
+		}
+	}
+	g, _ := NewGitHubWithClient("owner/private", "read-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())
+	if e := g.CheckAccess(context.Background(), true); !IsStatus(e, 403) {
+		t.Fatal(e)
+	}
+}
 func TestPrivateAndNetwork(t *testing.T) {
 	mock := testutil.NewGitHub()
 	g, e := NewGitHubWithClient("owner/private", "read-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())

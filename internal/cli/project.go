@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"nodi/internal/project"
 	"nodi/internal/storage"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -113,7 +111,7 @@ func (a *App) projectStatus(ctx context.Context) error {
 	} else if changes.Empty() {
 		fmt.Fprintln(a.Out, "No changes detected.\nNothing to publish.")
 	} else if len(files) == 0 {
-		fmt.Fprintln(a.Out, "No supported files remain. Empty packages cannot be published.")
+		fmt.Fprintln(a.Out, "No transferable files remain. Empty packages cannot be published.")
 	} else if all {
 		fmt.Fprintln(a.Out, "Ready to publish.")
 	} else {
@@ -145,11 +143,15 @@ func (a *App) autoPublish(ctx context.Context, o options) error {
 	if e != nil {
 		return e
 	}
-	s, e := a.StoreFor(b.Config.Repository, true)
+	return a.publishSource(ctx, o, b.Root, b.Config.Project, b.Config.Repository, &b)
+}
+
+func (a *App) publishSource(ctx context.Context, o options, source, name, repo string, b *project.Binding) error {
+	s, e := a.StoreFor(repo, true)
 	if e != nil {
 		return e
 	}
-	state, e := s.State(ctx, b.Config.Project)
+	state, e := s.State(ctx, name)
 	if e != nil {
 		return fmt.Errorf("remote state could not be verified; nothing published: %w", e)
 	}
@@ -170,18 +172,21 @@ func (a *App) autoPublish(ctx context.Context, o options) error {
 			return fmt.Errorf("version conflict: requested version must be newer than remote %s; retry the operation", state.Version)
 		}
 	}
-	desc := b.Config.Description
+	desc := ""
+	var metadata map[string]string
+	if b != nil {
+		desc, metadata = b.Config.Description, b.Config.Metadata
+	}
 	if o.description != "" {
 		desc = o.description
 	}
-	metadata := b.Config.Metadata
 	if o.metadata != "" {
 		metadata, e = readMetadata(o.metadata)
 		if e != nil {
 			return e
 		}
 	}
-	files, e := project.Scan(ctx, b)
+	files, e := archive.Scan(ctx, source)
 	if e != nil {
 		return e
 	}
@@ -190,14 +195,14 @@ func (a *App) autoPublish(ctx context.Context, o options) error {
 		old = state.Manifest.Files
 	}
 	changes := project.Diff(files, old)
-	if changes.Empty() {
+	if changes.Empty() && state.Manifest != nil && state.Manifest.Status == o.status {
 		fmt.Fprintln(a.Out, "No changes detected.\nNothing to publish.")
 		return nil
 	}
 	if len(files) == 0 {
-		return fmt.Errorf("no supported files remain; empty packages cannot be published")
+		return fmt.Errorf("no transferable files remain; empty packages cannot be published")
 	}
-	m, zip, e := archive.Prepare(ctx, b.Root, b.Config.Project, next, o.status, desc, metadata)
+	m, zip, e := archive.Prepare(ctx, source, name, next, o.status, desc, metadata)
 	if e != nil {
 		return e
 	}
@@ -209,60 +214,42 @@ func (a *App) autoPublish(ctx context.Context, o options) error {
 	if current == "" {
 		current = "none"
 	}
-	fmt.Fprintf(a.Out, "Project: %s\nStorage: %s\nFiles: %d\n\nAdded: %d\nModified: %d\nDeleted: %d\n\nCurrent version: %s\nNext version: %s\n\nStatus: %s\n", b.Config.Project, b.Config.Repository, len(m.Files), changes.Added, changes.Modified, changes.Deleted, current, next, o.status)
-	input := bufio.NewReader(a.In)
-	fmt.Fprint(a.Out, "\nPublish? [y/N] ")
-	answer, e := input.ReadString('\n')
-	if e != nil && e != io.EOF {
-		return e
-	}
-	answer = strings.ToLower(strings.TrimSpace(answer))
-	if answer != "y" && answer != "yes" {
-		fmt.Fprintln(a.Out, "Cancelled. Nothing published.")
-		return nil
-	}
-	if o.status == "released" {
-		phrase := fmt.Sprintf("release %s %s", b.Config.Project, next)
-		fmt.Fprintf(a.Out, "Released does not confirm engineering/manufacturing validation.\nConfirm production publication by typing %q: ", phrase)
-		answer, e = input.ReadString('\n')
-		if e != nil && e != io.EOF {
-			return e
-		}
-		if strings.TrimSpace(answer) != phrase {
-			fmt.Fprintln(a.Out, "Cancelled. Nothing published.")
-			return nil
-		}
-	}
+	fmt.Fprintf(a.Out, "Package: %s\nStorage: %s\nFiles: %d\nAdded: %d\nModified: %d\nDeleted: %d\nCurrent version: %s\nVersion: %s\nStatus: %s\n", name, repo, len(m.Files), changes.Added, changes.Modified, changes.Deleted, current, next, o.status)
 	if e = ctx.Err(); e != nil {
 		return e
 	}
-	latest, e := s.State(ctx, b.Config.Project)
+	latest, e := s.State(ctx, name)
 	if e != nil {
 		return fmt.Errorf("remote recheck failed; nothing published: %w", e)
 	}
 	if latest.Version != state.Version || (state.Manifest != nil && (latest.Manifest == nil || latest.Manifest.ArchiveSHA256 != state.Manifest.ArchiveSHA256 || latest.Manifest.Status != state.Manifest.Status)) {
-		return fmt.Errorf("version conflict: remote state changed after preview; retry the operation")
+		return fmt.Errorf("version conflict: remote state changed during packaging; retry the operation")
 	}
-	after, e := project.Scan(ctx, b)
+	after, e := archive.Scan(ctx, source)
 	if e != nil {
 		return e
 	}
 	if !project.Diff(after, m.Files).Empty() {
-		return fmt.Errorf("files changed after preview; retry the operation")
+		return fmt.Errorf("files changed during packaging; retry the operation")
 	}
-	bound, e := project.Read(b.Root)
-	if e != nil {
-		return e
+	if b != nil {
+		bound, err := project.Read(b.Root)
+		if err != nil {
+			return err
+		}
+		if bound.Config.Project != b.Config.Project || bound.Config.Repository != repo {
+			return fmt.Errorf("project binding changed during packaging; retry the operation")
+		}
 	}
-	if bound.Config.Project != b.Config.Project || bound.Config.Repository != b.Config.Repository {
-		return fmt.Errorf("project binding changed after preview; retry the operation")
-	}
+	fmt.Fprintln(a.Out, "Uploading...")
 	if e = s.Publish(ctx, m, zip); e != nil {
 		return e
 	}
 	fmt.Fprintf(a.Out, "Published %s %s (%s).\n", m.Project, m.Version, m.Status)
-	if e = b.SaveVersion(next); e != nil {
-		return fmt.Errorf("remote publication succeeded, but local version record failed; inspect GitHub before retrying: %w", e)
+	if b != nil {
+		if e = b.SaveVersion(next); e != nil {
+			return fmt.Errorf("remote publication succeeded, but local version record failed; inspect GitHub before retrying: %w", e)
+		}
 	}
 	return nil
 }

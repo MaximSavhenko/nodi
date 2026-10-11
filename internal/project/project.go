@@ -4,6 +4,7 @@ package project
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"nodi/internal/archive"
@@ -14,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+var ErrNotInitialized = errors.New("no initialized project found; run nodi init PROJECT in the project folder")
 
 type Config struct {
 	Schema      int               `json:"schema"`
@@ -95,7 +98,7 @@ func Find(start string) (Binding, error) {
 		}
 		parent := filepath.Dir(root)
 		if parent == root {
-			return Binding{}, fmt.Errorf("no initialized project found; run nodi init PROJECT in the project folder")
+			return Binding{}, ErrNotInitialized
 		}
 		root = parent
 	}

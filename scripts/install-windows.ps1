@@ -70,8 +70,10 @@ try {
         # Old releases do not have setup; installing them must remain supported.
         $helpText = (& $installed help) -join "`n"
         if ($helpText -match 'nodi setup') {
-            & $installed setup
-            if ($LASTEXITCODE -ne 0) { Write-Warning 'Completion setup did not finish. Run nodi setup again; the binary is installed.' }
+            $nodiSetupArguments = @('setup')
+            if ($helpText -match 'nodi setup --completion') { $nodiSetupArguments += '--completion' }
+            & $installed @nodiSetupArguments
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'Completion setup did not finish. Run nodi setup --completion again; the binary is installed.' }
         } else {
             Write-Output 'This version requires manual completion setup. See nodi completion.'
         }

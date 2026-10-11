@@ -37,6 +37,8 @@ type GitHub struct {
 	CorruptArchive bool
 	ForceStatus    int
 	Requests       []string
+	FailFinalRead  bool
+	MisreportFinalize bool
 	tags           map[string]string
 }
 
@@ -97,6 +99,10 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if json.NewDecoder(r.Body).Decode(&input) != nil {
 			w.WriteHeader(400)
+			return
+		}
+		if !strings.HasPrefix(input.Ref, "refs/") || strings.Count(input.Ref, "/") < 2 {
+			w.WriteHeader(422)
 			return
 		}
 		if _, ok := g.tags[input.Ref]; ok {
@@ -161,6 +167,7 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 		tag := strings.TrimPrefix(p, "/releases/tags/")
 		for _, release := range g.releases {
 			if release.Tag == tag && (!release.Draft || r.Header.Get("Authorization") == "Bearer write-test") {
+				if g.FailFinalRead && !release.Draft { w.WriteHeader(503); return }
 				respond(release)
 				return
 			}
@@ -226,8 +233,22 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(400)
 				return
 			}
+			if g.MisreportFinalize {
+				fake := g.releases[index]
+				fake.Draft, fake.Prerelease = patch.Draft, patch.Prerelease
+				respond(fake)
+				return
+			}
 			g.releases[index].Draft = patch.Draft
 			g.releases[index].Prerelease = patch.Prerelease
+			respond(g.releases[index])
+			return
+		}
+		if len(parts) == 1 && r.Method == "GET" {
+			if g.releases[index].Draft && r.Header.Get("Authorization") != "Bearer write-test" {
+				w.WriteHeader(404)
+				return
+			}
 			respond(g.releases[index])
 			return
 		}

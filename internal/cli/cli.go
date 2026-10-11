@@ -27,18 +27,20 @@ type App struct {
 	Out      io.Writer
 	Store    func(bool) (storage.Store, error)
 	StoreFor func(string, bool) (storage.Store, error)
+	Connect  func(string, string) (storage.Store, error)
 	Cwd      func() (string, error)
 	Open     func(string) error
 }
 
 func New(version string, in io.Reader, out io.Writer) *App {
 	a := &App{Version: version, In: in, Out: out, Open: local.Open, Cwd: os.Getwd}
+	a.Connect = func(repo, token string) (storage.Store, error) { return storage.NewGitHub(repo, token) }
 	a.StoreFor = func(repo string, write bool) (storage.Store, error) {
 		t, e := config.Token(write)
 		if e != nil {
 			return nil, e
 		}
-		return storage.NewGitHub(repo, t)
+		return a.Connect(repo, t)
 	}
 	a.Store = func(write bool) (storage.Store, error) {
 		c, e := config.Load()
@@ -53,6 +55,7 @@ func New(version string, in io.Reader, out io.Writer) *App {
 type options struct {
 	version, output, status, description, metadata, repo string
 	all, write, minor, major                             bool
+	draft                                                bool
 	args                                                 []string
 }
 
@@ -71,6 +74,8 @@ func parse(command string, args []string) (options, error) {
 		fs.StringVar(&o.metadata, "metadata", "", "JSON file")
 		fs.BoolVar(&o.minor, "minor", false, "increment minor version")
 		fs.BoolVar(&o.major, "major", false, "increment major version")
+		fs.BoolVar(&o.draft, "draft", false, "create an unpublished draft")
+	case "send":
 	case "list", "info":
 		fs.BoolVar(&o.all, "all", false, "include drafts (write credential)")
 	case "config":
@@ -122,11 +127,11 @@ func parse(command string, args []string) (options, error) {
 		return o, e
 	}
 	o.args = pos
-	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0, "init": 1, "status": 0}
+	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "send": 1, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0, "init": 1, "status": 0}
 	if len(pos) != counts[command] && !(command == "publish" && len(pos) == 0) {
 		return o, fmt.Errorf("%s expects %d positional arguments; run nodi help", command, counts[command])
 	}
-	if len(pos) > 0 {
+	if len(pos) > 0 && command != "send" {
 		if e := model.ValidateProject(pos[0]); e != nil {
 			return o, e
 		}
@@ -146,25 +151,35 @@ func parse(command string, args []string) (options, error) {
 		if len(pos) == 2 && o.version == "" {
 			return o, fmt.Errorf("publish requires --version MAJOR.MINOR.PATCH")
 		}
-		if len(pos) == 0 && o.status == "" {
+		if o.draft && o.status != "" && o.status != "draft" {
+			return o, fmt.Errorf("--draft conflicts with --status released")
+		}
+		if o.draft {
 			o.status = "draft"
 		}
+		if o.status == "" {
+			o.status = "released"
+		}
 		if o.status != "draft" && o.status != "released" {
-			return o, fmt.Errorf("publish requires explicit --status draft or --status released")
+			return o, fmt.Errorf("status must be draft or released")
 		}
 	}
 	return o, nil
 }
 
-const help = `Nodi — private engineering packages via GitHub Releases
+const help = `Nodi — private file delivery via GitHub Releases
 
   nodi version | nodi -v | nodi --version
   nodi completion [zsh|bash|powershell]
-  nodi setup [--check]            Persistent completion (asks before profile edits)
+  nodi setup [--repo OWNER/REPO] [--write] [--check]
+                                 Configure and verify separate read/write access
+  nodi setup --completion [--check]
+                                 Persistent completion (asks before profile edits)
+  nodi send PATH                  Send a file or directory; automatic version
   nodi init PROJECT [--repo OWNER/PRIVATE-REPO]
   nodi status                     Read-only local/remote SHA-256 comparison
-  nodi publish [--minor|--major]   Preview, confirm; default draft
-  nodi publish --status released  Explicit manufacturing-publication confirmation
+  nodi publish [--minor|--major]   Bound project; published by default, no prompt
+  nodi publish --draft            Explicit unpublished draft
   nodi config --repo OWNER/PRIVATE-REPO
   nodi auth login                 Read token from hidden stdin
   nodi auth login --write         Separate publication token
@@ -182,8 +197,11 @@ Default destination: Desktop/Nodi/PROJECT/VERSION.
 --output is the exact new destination directory. Existing paths are refused.
 --all needs a write token because GitHub hides drafts from read-only users.
 Automatic publication finds .nodi/project.json in this or an ancestor folder.
-Drafts count towards versions; no changes creates no release. Legacy explicit syntax is preserved.
-released is not CAD/manufacturing validation. Completion never edits shell profiles.
+Drafts count towards versions; unchanged released files create no release.
+An unchanged draft is delivered as a new released version; old assets are preserved.
+Hidden paths, credentials, keys and service folders are excluded (see README).
+Use a delivery folder; name exclusions cannot detect secrets inside ordinary documents.
+Published means available for download. Completion never edits shell profiles.
 Versions: MAJOR.MINOR.PATCH, without a prefix. Projects: lowercase letters/digits/hyphens.
 `
 
@@ -268,7 +286,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		if e != nil {
 			return e
 		}
-		if e = g.VerifyPrivate(ctx); e != nil {
+		if e = g.CheckAccess(ctx, o.write); e != nil {
 			return e
 		}
 		if e = config.SaveToken(t, o.write); e != nil {
@@ -304,6 +322,9 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintln(a.Out, "Opened:", p)
 		return nil
+	}
+	if cmd == "send" {
+		return a.send(ctx, o.args[0])
 	}
 	if cmd == "publish" {
 		if len(o.args) == 0 {
@@ -463,6 +484,6 @@ func (a *App) get(ctx context.Context, store storage.Store, o options) error {
 	if e = local.Record(c.Repository, m, dest); e != nil {
 		return fmt.Errorf("download verified at %s, but local record failed: %w", dest, e)
 	}
-	fmt.Fprintf(a.Out, "Verified %d files (SHA-256). Saved: %s\n", len(m.Files), dest)
+	fmt.Fprintf(a.Out, "Package: %s\nVersion: %s\nFiles: %d\nDownloaded successfully. Verified SHA-256.\nLocation: %s\n", m.Project, m.Version, len(m.Files), dest)
 	return nil
 }

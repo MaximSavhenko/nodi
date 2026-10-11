@@ -45,11 +45,15 @@ fi
 echo "Installed: $HOME/.local/bin/nodi. Reopen Terminal or run: export PATH=\"\$HOME/.local/bin:\$PATH\""
 if [ "$completion" -eq 1 ]; then
   if "$HOME/.local/bin/nodi" help | grep -q 'nodi setup'; then
+    set -- setup
+    if "$HOME/.local/bin/nodi" help | grep -q 'nodi setup --completion'; then
+      set -- setup --completion
+    fi
     if [ -t 0 ]; then
-      "$HOME/.local/bin/nodi" setup || echo 'Completion setup did not finish. Run nodi setup again; the binary is installed.' >&2
+      "$HOME/.local/bin/nodi" "$@" || echo 'Completion setup did not finish. Run nodi setup --completion again; the binary is installed.' >&2
     else
-      "$HOME/.local/bin/nodi" setup --check || true
-      echo 'For persistent completion, run nodi setup interactively (profile changes require consent).'
+      "$HOME/.local/bin/nodi" "$@" --check || true
+      echo 'For persistent completion, run nodi setup --completion interactively (profile changes require consent).'
     fi
   else
     echo 'This version requires manual completion setup. See nodi completion.'

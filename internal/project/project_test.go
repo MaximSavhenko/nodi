@@ -35,7 +35,7 @@ func TestInitFindPreserve(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(root, "part.dxf"), []byte("fictional"), 0644)
 	os.WriteFile(filepath.Join(root, ".nodi", "ignored.dxf"), []byte("not published"), 0600)
-	os.WriteFile(filepath.Join(root, "ignored.go"), []byte("ignored"), 0644)
+	os.WriteFile(filepath.Join(root, "token.json"), []byte("ignored secret"), 0644)
 	files, e := Scan(context.Background(), b)
 	if e != nil || len(files) != 1 || files[0].Path != "part.dxf" {
 		t.Fatal(files, e)

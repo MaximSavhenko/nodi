@@ -18,7 +18,7 @@ func TestParsing(t *testing.T) {
 			t.Fatal(args, e)
 		}
 	}
-	invalid := [][]string{{"unknown"}, {"get"}, {"get", "../demo"}, {"get", "demo", "--version"}, {"get", "demo", "--version", "v1"}, {"get", "demo", "--force"}, {"publish", "demo", "./parts"}, {"publish", "demo", "./parts", "--version", "1.0.0"}, {"version", "extra"}, {"open", "demo", "--output", "x"}}
+	invalid := [][]string{{"unknown"}, {"get"}, {"get", "../demo"}, {"get", "demo", "--version"}, {"get", "demo", "--version", "v1"}, {"get", "demo", "--force"}, {"publish", "demo", "./parts"}, {"publish", "--draft", "--status", "released"}, {"send"}, {"version", "extra"}, {"open", "demo", "--output", "x"}}
 	for _, args := range invalid {
 		if _, e := parse(args[0], args[1:]); e == nil {
 			t.Fatal("accepted", args)

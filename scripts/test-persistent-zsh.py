@@ -32,7 +32,7 @@ def snapshot(directory):
 
 
 def setup(program, env, answer="", check=False):
-    result = subprocess.run([str(program), "setup"] + (["--check"] if check else []),
+    result = subprocess.run([str(program), "setup", "--completion"] + (["--check"] if check else []),
                             input=answer, text=True, capture_output=True, env=env, check=True)
     return result.stdout
 
@@ -62,7 +62,7 @@ def fresh_tab(root, env):
         os.write(master, harness.encode())
         drain(master, 0.5)
         assert setting.read_text().strip() == "preserved", "Existing .zshrc setting was lost"
-        for line, expected in [("nodi pub", "nodi publish"), ("nodi se", "nodi setup"),
+        for line, expected in [("nodi pub", "nodi publish"), ("nodi set", "nodi setup"),
                                ("nodi get nod", "nodi get nodi-ux-1"),
                                ("nodi get nodi-ux-1 --version 0.2.", "nodi get nodi-ux-1 --version 0.2.1")]:
             capture.unlink(missing_ok=True)

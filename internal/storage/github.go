@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -199,6 +201,19 @@ func findAsset(r release, name string) (asset, error) {
 	return found, nil
 }
 func (g *GitHub) manifest(ctx context.Context, r release) (model.Manifest, error) {
+	m, e := g.manifestAssets(ctx, r)
+	if e != nil {
+		return m, e
+	}
+	if (m.Status == "draft") != r.Draft || (!r.Draft && r.Prerelease) {
+		return model.Manifest{}, fmt.Errorf("GitHub and Nodi release statuses differ for %s (GitHub draft=%t, prerelease=%t; manifest status=%s); do not toggle GitHub flags alone; preserve the assets and publish a verified new version with a consistent manifest", r.Tag, r.Draft, r.Prerelease, m.Status)
+	}
+	return m, nil
+}
+
+// Used only while the new release is still staged as a draft. Public readers
+// always use manifest, which enforces both GitHub flags and manifest status.
+func (g *GitHub) manifestAssets(ctx context.Context, r release) (model.Manifest, error) {
 	var empty model.Manifest
 	a, e := findAsset(r, model.ManifestName)
 	if e != nil {
@@ -219,9 +234,6 @@ func (g *GitHub) manifest(ctx context.Context, r release) (model.Manifest, error
 	if model.Tag(m.Project, m.Version) != r.Tag {
 		return empty, fmt.Errorf("tag and manifest identity differ")
 	}
-	if (m.Status == "draft") != r.Draft || (!r.Draft && r.Prerelease) {
-		return empty, fmt.Errorf("GitHub and Nodi release statuses differ")
-	}
 	zip, e := findAsset(r, model.ArchiveName)
 	if e != nil {
 		return empty, e
@@ -230,6 +242,34 @@ func (g *GitHub) manifest(ctx context.Context, r release) (model.Manifest, error
 		return empty, fmt.Errorf("archive asset size differs from manifest")
 	}
 	return m, nil
+}
+
+func (g *GitHub) verifyAssets(ctx context.Context, r release, expected model.Manifest) error {
+	actual, e := g.manifestAssets(ctx, r)
+	if e != nil {
+		return e
+	}
+	if !sameManifest(actual, expected) {
+		return fmt.Errorf("uploaded manifest differs from the prepared package")
+	}
+	a, e := findAsset(r, model.ArchiveName)
+	if e != nil {
+		return e
+	}
+	res, e := g.request(ctx, "GET", g.endpoint("/releases/assets/"+strconv.FormatInt(a.ID, 10)), "application/octet-stream", nil, -1)
+	if e != nil {
+		return e
+	}
+	defer res.Body.Close()
+	h := sha256.New()
+	n, e := io.Copy(h, io.LimitReader(res.Body, expected.ArchiveSize+1))
+	if e != nil {
+		return fmt.Errorf("uploaded archive verification interrupted")
+	}
+	if n != expected.ArchiveSize || hex.EncodeToString(h.Sum(nil)) != expected.ArchiveSHA256 {
+		return fmt.Errorf("uploaded archive SHA-256 or size mismatch")
+	}
+	return nil
 }
 func (g *GitHub) List(ctx context.Context, all bool) ([]model.Manifest, error) {
 	if e := g.VerifyPrivate(ctx); e != nil {
@@ -320,7 +360,7 @@ func (g *GitHub) Download(ctx context.Context, m model.Manifest, w io.Writer) er
 	if e != nil {
 		return e
 	}
-	if actual.ArchiveSHA256 != m.ArchiveSHA256 {
+	if !sameManifest(actual, m) {
 		return fmt.Errorf("manifest changed during download")
 	}
 	a, e := findAsset(r, model.ArchiveName)
@@ -340,6 +380,12 @@ func (g *GitHub) Download(ctx context.Context, m model.Manifest, w io.Writer) er
 		return fmt.Errorf("download size differs from manifest")
 	}
 	return nil
+}
+
+func sameManifest(a, b model.Manifest) bool {
+	x, ex := json.Marshal(a)
+	y, ey := json.Marshal(b)
+	return ex == nil && ey == nil && bytes.Equal(x, y)
 }
 func (g *GitHub) upload(ctx context.Context, r release, name, mime string, reader io.Reader, size int64) error {
 	endpoint := g.uploads + "/repos/" + g.repo + "/releases/" + strconv.FormatInt(r.ID, 10) + "/assets?name=" + url.QueryEscape(name)
@@ -434,6 +480,16 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 	if e = g.upload(ctx, r, model.ManifestName, "application/json", bytes.NewReader(b), int64(len(b))); e != nil {
 		return incomplete(e)
 	}
+	var staged release
+	if e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), nil, &staged); e != nil {
+		return incomplete(e)
+	}
+	if staged.ID != r.ID || !staged.Draft || staged.Tag != model.Tag(m.Project, m.Version) {
+		return incomplete(fmt.Errorf("staged release identity or draft state changed; inspect GitHub"))
+	}
+	if e = g.verifyAssets(ctx, staged, m); e != nil {
+		return incomplete(e)
+	}
 	if m.Status == "released" {
 		var completed release
 		if e = g.json(ctx, "PATCH", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), map[string]any{"draft": false, "prerelease": false, "make_latest": "false"}, &completed); e != nil {
@@ -442,6 +498,24 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 		if completed.Draft || completed.Prerelease {
 			return fmt.Errorf("GitHub did not confirm released status")
 		}
+	}
+	var final release
+	if m.Status == "released" {
+		final, e = g.byTag(ctx, model.Tag(m.Project, m.Version))
+	} else {
+		e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), nil, &final)
+	}
+	if e == nil && final.ID != r.ID {
+		e = fmt.Errorf("release identity changed")
+	}
+	if e == nil {
+		_, e = g.manifest(ctx, final)
+	}
+	if e == nil {
+		e = g.verifyAssets(ctx, final, m)
+	}
+	if e != nil {
+		return fmt.Errorf("final package availability was not verified; release %d retained; inspect GitHub before retrying: %w", r.ID, e)
 	}
 	return nil
 }
