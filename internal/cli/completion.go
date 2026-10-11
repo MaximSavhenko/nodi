@@ -78,12 +78,17 @@ func validCache(c completionCache) bool {
 	}
 	return true
 }
-func (a *App) remoteSuggestions(ctx context.Context, write bool) []suggestion {
+func (a *App) remoteSuggestions(ctx context.Context, write, useBinding bool) []suggestion {
 	repo := ""
-	if b, e := a.binding(); e == nil {
-		repo = b.Config.Repository
-	} else if c, e := config.Load(); e == nil {
-		repo = c.Repository
+	if useBinding {
+		if b, e := a.binding(); e == nil {
+			repo = b.Config.Repository
+		}
+	}
+	if repo == "" {
+		if c, e := config.Load(); e == nil {
+			repo = c.Repository
+		}
 	}
 	if repo == "" {
 		return nil
@@ -223,7 +228,7 @@ func (a *App) complete(ctx context.Context, words []string) {
 			}
 			if projectName != "" {
 				var values []string
-				for _, s := range a.remoteSuggestions(ctx, write) {
+				for _, s := range a.remoteSuggestions(ctx, write, cmd == "publish") {
 					if s.Project == projectName && strings.HasPrefix(s.Version, valuePrefix) {
 						values = append(values, equalPrefix+s.Version)
 					}
@@ -249,7 +254,7 @@ func (a *App) complete(ctx context.Context, words []string) {
 	case "get", "info", "open", "publish":
 		if len(positionals) == 0 {
 			var values []string
-			for _, s := range a.remoteSuggestions(ctx, write) {
+			for _, s := range a.remoteSuggestions(ctx, write, cmd == "publish") {
 				values = append(values, s.Project)
 			}
 			emit(values, cur)

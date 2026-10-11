@@ -10,7 +10,7 @@ Nodi передаёт инженерные пакеты между Windows и ma
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
-Версия 0.2.0 добавляет Tab completion, локальную привязку проекта, SHA-256 status и публикацию с автоматическим версионированием. Результаты и статус выпуска: [NODI-03](docs/NODI-03-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает принятия CLA владельцем и проверки Microsoft, manifest 0.2.0 готовится отдельно и не заменяет существующий PR.
+Версия 0.2.1 добавляет Tab completion, локальную привязку проекта, SHA-256 status и публикацию с автоматическим версионированием. Результаты и статус выпуска: [NODI-03](docs/NODI-03-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает принятия CLA владельцем и проверки Microsoft, manifest 0.2.1 готовится отдельно и не заменяет существующий PR.
 
 macOS, Apple Silicon и Intel:
 
@@ -132,14 +132,14 @@ nodi version
 
 Установка: `~/.local/bin/nodi`; PATH записывается в `~/.zprofile`. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-Сетевые режимы версии 0.2.0 (доступны после подтверждённого выпуска; статус — в отчёте NODI-03):
+Сетевые режимы версии 0.2.1 (доступны после подтверждённого выпуска; статус — в отчёте NODI-03):
 
 ```powershell
-.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.2.0
+.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.2.1
 ```
 
 ```sh
-sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.2.0
+sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.2.1
 ```
 
 Windows поддерживает приватный релиз CLI через переменную `NODI_INSTALL_TOKEN`; macOS сетевой режим рассчитан на публичный доверенный релиз, для приватной поставки используйте локальный комплект. Токены никогда не передаются аргументом команды. Контрольная сумма из того же доверенного релиза проверяет целостность; отдельной криптографической подписи поставки в v0.1 нет.

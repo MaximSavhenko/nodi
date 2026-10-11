@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+PackageIdentifier: MaximSavhenko.Nodi
+PackageVersion: 0.2.1
+MinimumOSVersion: 10.0.17763.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+- RelativeFilePath: nodi.exe
+  PortableCommandAlias: nodi
+Commands:
+- nodi
+UpgradeBehavior: uninstallPrevious
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/MaximSavhenko/nodi/releases/download/v0.2.1/nodi-windows-amd64.zip
+  InstallerSha256: 16305945A926FB75FC049F2FBBA4D0E5F80B76027B279B69EEF3573C8435E705
+ManifestType: installer
+ManifestVersion: 1.10.0

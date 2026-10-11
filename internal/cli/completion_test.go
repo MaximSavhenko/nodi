@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"nodi/internal/config"
+	"nodi/internal/storage"
 	"nodi/internal/testutil"
 	"os"
 	"path/filepath"
@@ -107,4 +108,32 @@ func TestDynamicCompletionCacheAndOffline(t *testing.T) {
 		t.Fatal("cache reused after credential change", got)
 	}
 	_ = root
+}
+
+func TestCompletionUsesCommandRepository(t *testing.T) {
+	a, fixture, out, _ := projectApp(t)
+	t.Setenv("NODI_REPO", "other/global")
+	t.Setenv("NODI_READ_TOKEN", "read-test")
+	t.Setenv("NODI_WRITE_TOKEN", "write-test")
+	var selected string
+	a.StoreFor = func(repo string, write bool) (storage.Store, error) {
+		selected = repo
+		return storage.NewGitHubWithClient("owner/private", "read-test", fixture.Server.URL, fixture.Server.URL, fixture.Server.Client())
+	}
+	for _, tt := range []struct{ command, repo string }{
+		{"get", "other/global"}, {"info", "other/global"}, {"open", "other/global"}, {"publish", "owner/private"},
+	} {
+		selected = ""
+		out.Reset()
+		a.complete(context.Background(), []string{tt.command, ""})
+		if selected != tt.repo {
+			t.Fatalf("%s completion queried %q, want %q", tt.command, selected, tt.repo)
+		}
+		// Empty indexes are cached too; remove them to observe every command's choice.
+		dir, _ := config.Dir()
+		paths, _ := filepath.Glob(filepath.Join(dir, "completion", "*.json"))
+		for _, path := range paths {
+			os.Remove(path)
+		}
+	}
 }
