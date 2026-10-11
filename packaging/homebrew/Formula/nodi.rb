@@ -8,11 +8,11 @@ class Nodi < Formula
   on_macos do
     on_arm do
       url "https://github.com/MaximSavhenko/nodi/releases/download/v0.3.0/nodi-darwin-arm64.zip"
-      sha256 "38a18d965e3b0af4a86253f3f3e6c96dd80cae2aeabe1994ceefe799c9217496"
+      sha256 "d356de6ad10b4f4696ac73ceb2c0b83c898750ca1ddefa8a4405e7fb5be77721"
     end
     on_intel do
       url "https://github.com/MaximSavhenko/nodi/releases/download/v0.3.0/nodi-darwin-amd64.zip"
-      sha256 "23b41a49f621b27fd19f55ae93408cb037d37a3b0f638a1568ebe3f750143352"
+      sha256 "82de9f750a1bc3d392d72cf5f17800bbfba47c215875f960d8a8064def67c874"
     end
   end
 

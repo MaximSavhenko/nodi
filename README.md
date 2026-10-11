@@ -10,7 +10,7 @@ Nodi передаёт файлы и их версии между Windows и macO
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
-Версия [0.3.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.3.0) объединяет NODI-04 и NODI-05: постоянный Tab completion и передачу `send PATH` → `get PROJECT` с проверкой SHA-256. Публикация стабильного CLI разрешена только после native CI для Windows amd64 и macOS ARM64/Intel. Физическая приёмка на устройствах пользователя остаётся отдельным обязательным шагом: [NODI-05](docs/NODI-05-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает CLA владельца и проверки Microsoft, manifests 0.2.0/0.2.1/0.3.0 подготовлены отдельно и не заменяют существующий PR.
+Версия [0.3.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.3.0) объединяет NODI-04 и NODI-05: постоянный Tab completion и передачу `send PATH` → `get PROJECT` с проверкой SHA-256. Публикация стабильного CLI разрешена только после native CI для Windows amd64 и macOS ARM64/Intel. Физическая приёмка на устройствах пользователя остаётся отдельным обязательным шагом: [NODI-05](docs/NODI-05-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; CLA уже пройден, но PR ещё ожидает рассмотрения Microsoft; manifests 0.2.0/0.2.1/0.3.0 подготовлены отдельно и не заменяют существующий PR.
 
 macOS, Apple Silicon и Intel:
 
