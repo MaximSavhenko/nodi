@@ -96,6 +96,22 @@ jobs:
       - name: Test actual bash and zsh completion widgets
         if: runner.os == 'macOS'
         run: python3 scripts/test-shell-completion.py './dist/nodi-${{ matrix.platform }}'
+      - name: Verify installer preserves profiles unless explicitly requested
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d "$RUNNER_TEMP/nodi-profile.XXXXXXXX")"
+          trap 'rm -rf "$test_home"' EXIT
+          printf 'existing user configuration\n' > "$test_home/.zprofile"
+          cp "$test_home/.zprofile" "$test_home/profile-before"
+          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist"
+          cmp "$test_home/.zprofile" "$test_home/profile-before"
+          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path
+          grep -Fqx 'export PATH="$HOME/.local/bin:$PATH"' "$test_home/.zprofile"
+          cp "$test_home/.zprofile" "$test_home/profile-after"
+          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path
+          cmp "$test_home/.zprofile" "$test_home/profile-after"
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build, native]

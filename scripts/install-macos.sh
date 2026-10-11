@@ -1,11 +1,12 @@
 #!/bin/sh
 set -eu
-usage() { echo 'Usage: sh install-macos.sh --bundle DIRECTORY | --repo OWNER/REPO --release v0.1.0 [--no-path]' >&2; exit 1; }
-bundle='' repo='' release='' add_path=1
+usage() { echo 'Usage: sh install-macos.sh --bundle DIRECTORY | --repo OWNER/REPO --release vX.Y.Z [--add-path|--no-path]' >&2; exit 1; }
+bundle='' repo='' release='' add_path=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --bundle|--repo|--release) [ "$#" -ge 2 ] || usage; key=$1; value=$2; shift 2; case "$key" in --bundle) bundle=$value;; --repo) repo=$value;; --release) release=$value;; esac;;
     --no-path) add_path=0; shift;;
+    --add-path) add_path=1; shift;;
     *) usage;;
   esac
 done
