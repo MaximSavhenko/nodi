@@ -11,6 +11,8 @@
 5. Только после успеха всех native jobs публикуется `validation.json` со статусом confirmed, SHA-256, исходным коммитом и ссылкой на CI. Создаётся GitHub draft с вложениями; после загрузок он становится стабильным релизом. Существующий тег/релиз нельзя перезаписать workflow.
 6. Отдельный Windows job проверяет опубликованный winget manifest и настоящий portable install / version detection / uninstall на временном runner. Он **не доказывает** доступность в публичном источнике winget. Настройка LocalManifestFiles включается только на одноразовом CI runner, а не на компьютере пользователя.
 
+Для повторной проверки уже опубликованного пакета запускается manual workflow `winget-smoke.yml` с номером версии. Он не создаёт и не заменяет релиз. Пока пакет не принят в источник, local-manifest установка отображается по ARP ID: проверяются имя, Publisher, DisplayVersion, WinGetPackageIdentifier и `winget list --name Nodi --exact`; удаление выполняется по тому же manifest.
+
 Для локальной подготовки: `scripts/build.ps1`, `scripts/generate-distribution.ps1`, `scripts/verify-distribution.ps1`. Установщикам и пользователям Go не требуется. SHA-256 ZIP является хэшем именно ZIP-контейнера, а не вложенного exe.
 
 ## Homebrew

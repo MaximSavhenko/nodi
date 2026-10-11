@@ -10,6 +10,8 @@ Nodi передаёт инженерные пакеты между Windows и ma
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
+Опубликован [стабильный Nodi 0.1.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.1.0). Homebrew проверен на Apple Silicon и Intel. [Winget PR #450627](https://github.com/microsoft/winget-pkgs/pull/450627) ожидает принятия Contributor License Agreement владельцем аккаунта и проверки Microsoft; установка из официального источника пока не подтверждена.
+
 macOS, Apple Silicon и Intel:
 
 ```sh
@@ -35,6 +37,8 @@ winget uninstall --id MaximSavhenko.Nodi --exact
 
 WinGet управляет portable ZIP, командой `nodi` в PATH, установленной версией и удалением. Если команда пока не находится в официальном источнике, используйте терминальный установщик ниже. Локальная проверка manifest и установка из manifest не означают доступность пакета в каталоге Microsoft. Актуальные ссылки на релиз, PR и результаты проверок: [docs/NODI-02-STATUS.md](docs/NODI-02-STATUS.md).
 
+При переходе с терминального установщика на winget удалите прежний `%LOCALAPPDATA%\Nodi\bin\nodi.exe` и его запись пользовательского PATH по инструкции удаления ниже. Затем установите пакет через winget и откройте новый терминал. Так обновления winget будут запускать управляемый им бинарник; скачанные проекты и конфигурация сохранятся.
+
 ## Установка через терминал
 
 В этой локальной поставке самостоятельные программы находятся в `dist/`:
@@ -42,7 +46,7 @@ WinGet управляет portable ZIP, командой `nodi` в PATH, уст�
 - `nodi-windows-amd64.exe` — Windows x64.
 - `nodi-darwin-arm64` — Apple Silicon.
 - `nodi-darwin-amd64` — Intel Mac.
-- `SHA256SUMS` — контрольные суммы всех трёх программ.
+- `SHA256SUMS` — контрольные суммы трёх программ и трёх ZIP-пакетов.
 
 Сначала прочитайте исходный код установщика. Go нужен разработчику для сборки, но не пользователю для установки и работы.
 
@@ -68,7 +72,7 @@ nodi version
 
 Установка: `~/.local/bin/nodi`; PATH записывается в `~/.zprofile`. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-После **явной публикации разработчиком** CLI-сборок и `SHA256SUMS` в доверенном GitHub-релизе доступны сетевые режимы. Замените `OWNER/NODI-CODE` на выбранный репозиторий исходного кода CLI:
+Для опубликованного стабильного релиза 0.1.0 доступны сетевые режимы:
 
 ```powershell
 .\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.1.0
