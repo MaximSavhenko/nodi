@@ -17,7 +17,7 @@
 | Монотонность после удаления | PASS | Реальный API: 0.1.0 → 0.1.1 → delete latest → 0.1.2 → delete all → 0.1.3 |
 | Локальные файлы и parent binding | PASS | Реальный test source, JSON и download SHA-256 сохранились |
 | Настоящий PowerShell completion | PASS | Windows PowerShell: старые и новые команды/флаги/версии |
-| macOS ARM64 / Intel native CI | PENDING | Проверяется в draft PR; cross-compilation отдельно не считается native runtime |
+| macOS ARM64 / Intel native CI | PASS | [CI 38170131775](https://github.com/MaximSavhenko/nodi/actions/runs/38170131775), commit 4802495; оба native runner и completion |
 | Физическая приёмка пользователя | NOT VERIFIED | Требуется новый binary на Windows и Mac после разрешённого выпуска |
 
 Реальный destructive-тест использовал только специально созданный `nodi06-delete-test-*`: четыре созданные версии удалены, их четыре version-history refs оставлены намеренно. Локальная папка fixture сохранена как evidence. Скрипт [test-storage-management.ps1](../scripts/test-storage-management.ps1) принимает только путь binary и фиксированный storage repo; credentials передаются через env, не аргументы. Он не выполняется автоматически в обычном CI.

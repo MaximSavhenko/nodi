@@ -1,10 +1,10 @@
-# Nodi CLI 0.3
+# Nodi CLI 0.4
 
 Nodi передаёт файлы и их версии между Windows и macOS через приватный репозиторий GitHub и его Releases. На компьютере получателя нужны только Nodi и доступ в интернет. CAD, Git, Go, VPN и домашний сервер не нужны.
 
 Команды запускаются вручную. Nodi не проверяет технологическую пригодность чертежей: `released` означает доступность пакета для скачивания.
 
-В исходниках подготовлен NODI-06 для следующей версии; опубликованная 0.3.0 ещё не содержит этих команд:
+В 0.4.0 доступны команды NODI-06:
 
 ```text
 nodi send DXF --dry-run
@@ -30,7 +30,7 @@ nodi update --check
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
-Версия [0.3.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.3.0) объединяет NODI-04 и NODI-05: постоянный Tab completion и передачу `send PATH` → `get PROJECT` с проверкой SHA-256. Публикация стабильного CLI разрешена только после native CI для Windows amd64 и macOS ARM64/Intel. Физическая приёмка на устройствах пользователя остаётся отдельным обязательным шагом: [NODI-05](docs/NODI-05-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; CLA уже пройден, но PR ещё ожидает рассмотрения Microsoft; manifests 0.2.0/0.2.1/0.3.0 подготовлены отдельно и не заменяют существующий PR.
+Версия [0.4.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.4.0) завершает NODI-06, сохраняя постоянный Tab completion и передачу `send PATH` → `get PROJECT` с проверкой SHA-256. Публикация стабильного CLI разрешена только после native CI для Windows amd64 и macOS ARM64/Intel и проверки обновления с 0.3.0. Физическая приёмка на устройствах пользователя остаётся отдельным шагом. [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; manifests 0.4.0 подготовлены отдельно и не заменяют существующий PR или подтверждение Microsoft.
 
 macOS, Apple Silicon и Intel:
 
@@ -171,14 +171,14 @@ nodi version
 
 Установка: `~/.local/bin/nodi`. В интерактивном терминале установщик предлагает `setup --completion`; изменение `.zshrc` требует отдельного согласия. Без терминального stdin выполняется только `setup --completion --check` и выводится инструкция; `--no-completion` пропускает этот шаг. Для текущего терминала используйте `export PATH` выше. Явный `--add-path` по-прежнему разрешает добавление PATH в `~/.zprofile`. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-Установка или обновление до версии 0.3.0:
+Установка или обновление до версии 0.4.0:
 
 ```powershell
-.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.3.0
+.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.4.0
 ```
 
 ```sh
-sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.3.0
+sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.4.0
 ```
 
 Windows поддерживает приватный релиз CLI через переменную `NODI_INSTALL_TOKEN`; macOS сетевой режим рассчитан на публичный доверенный релиз, для приватной поставки используйте локальный комплект. Токены никогда не передаются аргументом команды. Контрольная сумма из того же доверенного релиза проверяет целостность; отдельной криптографической подписи поставки в v0.1 нет.
