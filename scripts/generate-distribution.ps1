@@ -77,9 +77,9 @@ end
 Write-NodiText (Join-Path $PackagingDirectory 'homebrew\Formula\nodi.rb') $formula
 Write-NodiText (Join-Path $DistributionDirectory 'nodi.rb') $formula
 $manifestDirectory = Join-Path $PackagingDirectory "winget\manifests\m\$Owner\Nodi\$Version"
-$schemaVersion = '1.12.0'
+$schemaVersion = '1.10.0'
 $versionManifest = @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
 PackageIdentifier: $packageId
 PackageVersion: $Version
 DefaultLocale: en-US
@@ -87,7 +87,7 @@ ManifestType: version
 ManifestVersion: $schemaVersion
 "@
 $localeManifest = @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
 PackageIdentifier: $packageId
 PackageVersion: $Version
 PackageLocale: en-US
@@ -109,7 +109,7 @@ ManifestType: defaultLocale
 ManifestVersion: $schemaVersion
 "@
 $installerManifest = @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 PackageIdentifier: $packageId
 PackageVersion: $Version
 MinimumOSVersion: 10.0.17763.0
