@@ -264,13 +264,13 @@ func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''")
 
 func powershellSetupBlock(executable string) string {
 	return setupStart + `
-if (-not (Get-Command nodi -CommandType Application -ErrorAction SilentlyContinue)) {
-    if (Test-Path -LiteralPath ` + psQuote(executable) + `) {
-        $env:PATH = ` + psQuote(filepath.Dir(executable)) + ` + [IO.Path]::PathSeparator + $env:PATH
-    }
-}
 if (Get-Command nodi -CommandType Application -ErrorAction SilentlyContinue) {
     nodi completion powershell | Out-String | Invoke-Expression
+} else {
+    if (Test-Path -LiteralPath ` + psQuote(executable) + `) {
+        $env:PATH = ` + psQuote(filepath.Dir(executable)) + ` + [IO.Path]::PathSeparator + $env:PATH
+        & ` + psQuote(executable) + ` completion powershell | Out-String | Invoke-Expression
+    }
 }
 ` + setupEnd
 }
