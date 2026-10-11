@@ -237,3 +237,61 @@ func TestDeleteAllStopsAfterPartialFailure(t *testing.T) {
 		t.Fatal("failed item removed", e)
 	}
 }
+
+func TestDeleteDraftWhenReleaseByTagReturns404(t *testing.T) {
+	mock := testutil.NewGitHub()
+	defer mock.Close()
+	mock.Configure(func(g *testutil.GitHub) { g.DraftTagUnavailable = true })
+	g, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "data.txt"), []byte("fictional draft"), 0644)
+	ctx := context.Background()
+	m, z, e := archive.Prepare(ctx, root, "draft-demo", "0.1.0", "draft", "", nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer os.Remove(z)
+	if e = g.Publish(ctx, m, z); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = g.byTag(ctx, "draft-demo/v0.1.0"); !IsStatus(e, 404) {
+		t.Fatal("fixture must reproduce draft tag lookup", e)
+	}
+	plan, e := g.PlanDelete(ctx, "draft-demo", "0.1.0", false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = g.Delete(ctx, plan); e != nil {
+		t.Fatal(e)
+	}
+	state, e := g.State(ctx, "draft-demo")
+	if e != nil || state.Version != "0.1.0" || state.Manifest != nil {
+		t.Fatal(state, e)
+	}
+	if _, e = g.tagRef(ctx, "draft-demo/v0.1.0"); !IsStatus(e, 404) {
+		t.Fatal("draft package tag remains", e)
+	}
+}
+
+func TestDeleteRetainsTagWhenInvisibleDraftReplacesRelease(t *testing.T) {
+	g, mock, _ := deleteFixture(t)
+	ctx := context.Background()
+	plan, e := g.PlanDelete(ctx, "demo", "0.1.1", false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	mock.Configure(func(g *testutil.GitHub) { g.DraftTagUnavailable = true; g.ReplaceDeletedWithDraft = true })
+	if e = g.Delete(ctx, plan); e == nil || !strings.Contains(e.Error(), "replacement release") {
+		t.Fatal("replacement draft not detected", e)
+	}
+	if _, e = g.tagRef(ctx, "demo/v0.1.1"); e != nil {
+		t.Fatal("replacement draft tag was removed", e)
+	}
+	mock.Configure(func(g *testutil.GitHub) {
+		for _, r := range g.Requests {
+			if strings.HasPrefix(r, "DELETE ") && strings.Contains(r, "/git/refs/tags/") {
+				t.Fatal("tag deleted after draft replacement", r)
+			}
+		}
+	})
+}

@@ -181,7 +181,10 @@ func (g *GitHub) Delete(ctx context.Context, plan DeletionPlan) error {
 		fail := func(err error) error {
 			return fmt.Errorf("deletion stopped at %s; %d earlier releases completed, %d later releases untouched; %s; retry only after inspection: %w", item.Tag, i, len(plan.Items)-i-1, g.deletionState(ctx, item), err)
 		}
-		current, e := g.byTag(ctx, item.Tag)
+		// GitHub's release-by-tag endpoint only returns published releases.
+		// The approved ID also works for drafts and prevents identity changes.
+		var current release
+		e := g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current)
 		if e != nil {
 			return fail(e)
 		}
@@ -193,7 +196,7 @@ func (g *GitHub) Delete(ctx context.Context, plan DeletionPlan) error {
 		if e != nil {
 			return fail(e)
 		}
-		if current.ID != item.ReleaseID || !sameManifest(m, item.Manifest) || ref.Object.SHA != item.TagSHA {
+		if current.ID != item.ReleaseID || current.Tag != item.Tag || !sameManifest(m, item.Manifest) || ref.Object.SHA != item.TagSHA {
 			return fail(fmt.Errorf("release or tag changed after confirmation"))
 		}
 		e = g.json(ctx, "DELETE", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, nil)
@@ -205,6 +208,17 @@ func (g *GitHub) Delete(ctx context.Context, plan DeletionPlan) error {
 		// A replacement Release must not have appeared under the same tag.
 		if _, e = g.byTag(ctx, item.Tag); !IsStatus(e, 404) {
 			return fail(fmt.Errorf("release-by-tag absence not verified: %v", e))
+		}
+		// A replacement draft is invisible to release-by-tag. Check the complete
+		// authenticated release inventory before removing its shared tag.
+		remaining, e := g.releases(ctx)
+		if e != nil {
+			return fail(fmt.Errorf("release inventory absence not verified: %w", e))
+		}
+		for _, r := range remaining {
+			if r.Tag == item.Tag {
+				return fail(fmt.Errorf("replacement release %d exists under %s; tag retained", r.ID, item.Tag))
+			}
 		}
 		ref, e = g.tagRef(ctx, item.Tag)
 		if e != nil || ref.Object.SHA != item.TagSHA {

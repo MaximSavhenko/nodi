@@ -8,7 +8,7 @@ import (
 	"os/signal"
 )
 
-var version = "0.4.0"
+var version = "0.4.1"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
