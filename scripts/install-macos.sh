@@ -1,12 +1,13 @@
 #!/bin/sh
 set -eu
-usage() { echo 'Usage: sh install-macos.sh --bundle DIRECTORY | --repo OWNER/REPO --release vX.Y.Z [--add-path|--no-path]' >&2; exit 1; }
-bundle='' repo='' release='' add_path=0
+usage() { echo 'Usage: sh install-macos.sh --bundle DIRECTORY | --repo OWNER/REPO --release vX.Y.Z [--add-path|--no-path] [--no-completion]' >&2; exit 1; }
+bundle='' repo='' release='' add_path=0 completion=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --bundle|--repo|--release) [ "$#" -ge 2 ] || usage; key=$1; value=$2; shift 2; case "$key" in --bundle) bundle=$value;; --repo) repo=$value;; --release) release=$value;; esac;;
     --no-path) add_path=0; shift;;
     --add-path) add_path=1; shift;;
+    --no-completion) completion=0; shift;;
     *) usage;;
   esac
 done
@@ -42,3 +43,15 @@ if [ "$add_path" -eq 1 ]; then
   grep -Fqx "$path_line" "$HOME/.zprofile" || printf '\n%s\n' "$path_line" >> "$HOME/.zprofile"
 fi
 echo "Installed: $HOME/.local/bin/nodi. Reopen Terminal or run: export PATH=\"\$HOME/.local/bin:\$PATH\""
+if [ "$completion" -eq 1 ]; then
+  if "$HOME/.local/bin/nodi" help | grep -q 'nodi setup'; then
+    if [ -t 0 ]; then
+      "$HOME/.local/bin/nodi" setup || echo 'Completion setup did not finish. Run nodi setup again; the binary is installed.' >&2
+    else
+      "$HOME/.local/bin/nodi" setup --check || true
+      echo 'For persistent completion, run nodi setup interactively (profile changes require consent).'
+    fi
+  else
+    echo 'This version requires manual completion setup. See nodi completion.'
+  fi
+fi

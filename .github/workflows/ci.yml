@@ -96,6 +96,39 @@ jobs:
       - name: Test actual bash and zsh completion widgets
         if: runner.os == 'macOS'
         run: python3 scripts/test-shell-completion.py './dist/nodi-${{ matrix.platform }}'
+      - name: Test fresh PowerShell 5.1 and 7 startup with real profiles
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/test-persistent-completion.ps1 -Binary './dist/nodi-windows-amd64.exe' -Shell (Get-Process -Id $PID).Path -ConfigureProfiles
+          ./scripts/test-persistent-completion.ps1 -Binary './dist/nodi-windows-amd64.exe' -Shell "$env:SystemRoot/System32/WindowsPowerShell/v1.0/powershell.exe" -ConfigureProfiles
+      - name: Test fresh Zsh startup and literal Tab after setup
+        if: runner.os == 'macOS'
+        run: python3 scripts/test-persistent-zsh.py './dist/nodi-${{ matrix.platform }}'
+      - name: Test local Homebrew formula and fresh Zsh startup
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          set -euo pipefail
+          # Use this build's ZIPs in a temporary local tap; never publish a formula/release.
+          brew tap-new nodi-test/local
+          tap_root="$(brew --repo nodi-test/local)"
+          python3 - "$PWD" "$tap_root" <<'PY'
+          from pathlib import Path
+          import re, sys
+          root, tap = map(Path, sys.argv[1:])
+          formula = (root / 'dist/nodi.rb').read_text()
+          formula = re.sub(r'https://github.com/[^" ]+/releases/download/v[0-9.]+/(nodi-darwin-[a-z0-9]+\.zip)', lambda m: (root / 'dist' / m[1]).as_uri(), formula)
+          (tap / 'Formula/nodi.rb').write_text(formula)
+          PY
+          brew install nodi-test/local/nodi
+          brew test nodi-test/local/nodi
+          python3 scripts/test-persistent-zsh.py "$(brew --prefix)/bin/nodi" --homebrew
+          brew reinstall nodi-test/local/nodi
+          python3 scripts/test-persistent-zsh.py "$(brew --prefix)/bin/nodi" --homebrew
+          brew uninstall nodi-test/local/nodi
+          brew untap nodi-test/local
       - name: Verify installer preserves profiles unless explicitly requested
         if: runner.os == 'macOS'
         shell: bash
@@ -105,12 +138,12 @@ jobs:
           trap 'rm -rf "$test_home"' EXIT
           printf 'existing user configuration\n' > "$test_home/.zprofile"
           cp "$test_home/.zprofile" "$test_home/profile-before"
-          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist"
+          HOME="$test_home" ZDOTDIR="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --no-completion
           cmp "$test_home/.zprofile" "$test_home/profile-before"
-          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path
+          HOME="$test_home" ZDOTDIR="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path --no-completion
           grep -Fqx 'export PATH="$HOME/.local/bin:$PATH"' "$test_home/.zprofile"
           cp "$test_home/.zprofile" "$test_home/profile-after"
-          HOME="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path
+          HOME="$test_home" ZDOTDIR="$test_home" sh scripts/install-macos.sh --bundle "$PWD/dist" --add-path --no-completion
           cmp "$test_home/.zprofile" "$test_home/profile-after"
   publish:
     if: startsWith(github.ref, 'refs/tags/v')

@@ -21,9 +21,13 @@ Tap workflow опрашивает стабильный релиз каждый �
 
 При обновлении версии пользователь выполняет `brew update`, затем `brew upgrade MaximSavhenko/nodi/nodi`. Formula не компилирует Go.
 
+Completion продолжает устанавливаться штатными `zsh_completion.install` / `bash_completion.install`, на обеих архитектурах. Формула не меняет dotfiles. `nodi setup` использует этот `_nodi`, распознаёт стандартный `brew shellenv`/`compinit` и запрашивает согласие перед необходимой правкой `.zshrc`. Блок ссылается на prefix, а не на версионный Cellar, поэтому сохраняется при upgrade.
+
 ## winget
 
 Пакет: `MaximSavhenko.Nodi`, `InstallerType: zip`, `NestedInstallerType: portable`, вложенный `nodi.exe`, alias `nodi`, SHA-256 внешнего ZIP. Используется совместимая схема 1.10.0 с поддержкой portable ZIP. WinGet управляет PATH через свои portable links и ведёт запись установленной версии. Проекты и credentials не находятся в установочной папке и не удаляются вместе с CLI.
+
+Portable winget не выполняет установщик PowerShell и не меняет профили: после установки нужен однократный `nodi setup`. Скриптовый Windows-установщик сам вызывает setup с подтверждением; `-NoCompletion` пропускает настройку. Новые установщики совместимы со старыми бинарниками без setup. Обновление заменяет exe, а профили ссылаются на текущую команду, не на версию.
 
 В стабильном релизе лежит `winget-manifests.zip`; его содержимое отправляется в `microsoft/winget-pkgs` под `manifests/m/MaximSavhenko/Nodi/VERSION`. Перед PR нужно проверить отсутствие дубликата, актуальный SHA, публичный URL, `winget validate` и установку. PR ограничивается одной версией одного пакета. Публикация в каталоге — отдельное внешнее решение Microsoft; даже успешный install из локального manifest не позволяет заявить, что `winget install --source winget` уже работает.
 

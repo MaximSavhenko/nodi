@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Remote')][ValidatePattern('^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$')][string]$Repository,
     [Parameter(Mandatory, ParameterSetName = 'Remote')][ValidatePattern('^v\d+\.\d+\.\d+$')][string]$Release,
     [string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Nodi\bin'),
-    [switch]$NoPath
+    [switch]$NoPath,
+    [switch]$NoCompletion
 )
 $ErrorActionPreference = 'Stop'
 if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { throw 'This installer requires Windows x64.' }
@@ -65,6 +66,16 @@ try {
         if (($env:Path -split ';') -notcontains $InstallDirectory) { $env:Path += ';' + $InstallDirectory }
     }
     Write-Output "Installed: $installed"
+    if (-not $NoCompletion) {
+        # Old releases do not have setup; installing them must remain supported.
+        $helpText = (& $installed help) -join "`n"
+        if ($helpText -match 'nodi setup') {
+            & $installed setup
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'Completion setup did not finish. Run nodi setup again; the binary is installed.' }
+        } else {
+            Write-Output 'This version requires manual completion setup. See nodi completion.'
+        }
+    }
 } finally {
     # Only this invocation's verified, freshly created temporary directory.
     $resolvedTemporary = [IO.Path]::GetFullPath($temporary)

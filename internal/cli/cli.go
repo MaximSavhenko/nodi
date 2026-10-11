@@ -158,6 +158,7 @@ const help = `Nodi — private engineering packages via GitHub Releases
 
   nodi version | nodi -v | nodi --version
   nodi completion [zsh|bash|powershell]
+  nodi setup [--check]            Persistent completion (asks before profile edits)
   nodi init PROJECT [--repo OWNER/PRIVATE-REPO]
   nodi status                     Read-only local/remote SHA-256 comparison
   nodi publish [--minor|--major]   Preview, confirm; default draft
@@ -210,6 +211,9 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	}
 	if cmd == "completion" {
 		return a.completion(rest)
+	}
+	if cmd == "setup" {
+		return a.setup(ctx, rest)
 	}
 	if cmd == "--help" || cmd == "-h" {
 		cmd = "help"
