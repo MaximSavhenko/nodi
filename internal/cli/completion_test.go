@@ -44,6 +44,20 @@ func TestStaticCompletionAndAliases(t *testing.T) {
 		t.Fatal(out.String(), e)
 	}
 }
+
+func TestCompletionJSONWithPowerShellBOM(t *testing.T) {
+	for _, tt := range []struct{ request, want string }{
+		{`["pub"]`, "publish\n"},
+		{`["get","demo","--output",""]`, ":files\n"},
+		{`not JSON`, ""},
+	} {
+		var out bytes.Buffer
+		a := New("test", strings.NewReader("\ufeff"+tt.request+"\r\n"), &out)
+		if err := a.Run(context.Background(), []string{"__complete", "--json"}); err != nil || out.String() != tt.want {
+			t.Fatal(tt, out.String(), err)
+		}
+	}
+}
 func TestDynamicCompletionCacheAndOffline(t *testing.T) {
 	a, fixture, out, root := projectApp(t)
 	t.Setenv("NODI_READ_TOKEN", "")

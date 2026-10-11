@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -194,7 +196,13 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	rest := args[1:]
 	if cmd == "__complete" {
 		if len(rest) == 1 && rest[0] == "--json" {
-			if json.NewDecoder(io.LimitReader(a.In, 65536)).Decode(&rest) != nil {
+			input := bufio.NewReader(io.LimitReader(a.In, 65536))
+			// Some Windows PowerShell 5.1 hosts prefix native stdin with UTF-8 BOM,
+			// even with a BOM-less $OutputEncoding. This only affects completion IPC.
+			if prefix, _ := input.Peek(3); bytes.Equal(prefix, []byte{0xef, 0xbb, 0xbf}) {
+				_, _ = input.Discard(3)
+			}
+			if json.NewDecoder(input).Decode(&rest) != nil {
 				return nil
 			}
 		}

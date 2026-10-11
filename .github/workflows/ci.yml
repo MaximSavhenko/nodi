@@ -5,37 +5,13 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
-    inputs:
-      probe_run:
-        description: "Temporary startup diagnostic using an existing build artifact"
-        type: string
-        default: ''
 permissions:
   contents: read
 concurrency:
   group: nodi-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  completion-probe:
-    if: inputs.probe_run != ''
-    runs-on: windows-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: nodi-distribution
-          path: dist
-          run-id: ${{ inputs.probe_run }}
-          github-token: ${{ github.token }}
-      - shell: pwsh
-        run: ./scripts/test-persistent-completion.ps1 -Binary './dist/nodi-windows-amd64.exe' -Shell "$env:SystemRoot/System32/WindowsPowerShell/v1.0/powershell.exe" -ConfigureProfiles
   build:
-    if: inputs.probe_run == ''
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
