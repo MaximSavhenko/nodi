@@ -20,6 +20,11 @@ try {
         [IO.File]::WriteAllText("$root/config/completion/$key.json",$cache,[Text.UTF8Encoding]::new($false))
     }
     nodi completion powershell | Out-String | Invoke-Expression
+    foreach($case in @(@('nodi del',@('delete')),@('nodi upd',@('update')),@('nodi send fixture --n',@('--name')),@('nodi send fixture --d',@('--dry-run')),@('nodi delete nod',@('nodi-demo')),@('nodi delete nodi-demo --version 0.1.',@('0.1.0','0.1.1')),@('nodi delete nodi-demo --d',@('--dry-run')),@('nodi update --c',@('--check')))) {
+        $result=TabExpansion2 -inputScript $case[0] -cursorColumn $case[0].Length
+        $actual=@($result.CompletionMatches | ForEach-Object CompletionText)
+        foreach($expected in $case[1]) {if($actual -notcontains $expected){throw "Missing NODI-06 completion $expected for $($case[0]): $actual"}}
+    }
     foreach($case in @(@('nodi pub',@('publish')),@('nodi auth lo',@('login','logout')),@('nodi get nod',@('nodi-demo')),@('nodi get nodi-demo --version 0.1.',@('0.1.0','0.1.1')),@('nodi get nodi-demo --o',@('--output')),@('nodi publish --status r',@('released')))) {
         $result=TabExpansion2 -inputScript $case[0] -cursorColumn $case[0].Length
         $actual=@($result.CompletionMatches | ForEach-Object CompletionText)

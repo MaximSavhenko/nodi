@@ -276,6 +276,19 @@ func Extract(ctx context.Context, name string, m model.Manifest, destination str
 }
 
 func sourceNames(ctx context.Context, source string, requireFiles bool) (string, []string, error) {
+	return sourceNamesReport(ctx, source, requireFiles, nil)
+}
+
+// Excluded records a file or a whole pruned directory (with a trailing slash).
+type Excluded struct{ Path, Reason string }
+
+func Exclusions(ctx context.Context, source string) ([]Excluded, error) {
+	var excluded []Excluded
+	_, _, err := sourceNamesReport(ctx, source, false, &excluded)
+	return excluded, err
+}
+
+func sourceNamesReport(ctx context.Context, source string, requireFiles bool, excluded *[]Excluded) (string, []string, error) {
 	source, e := filepath.Abs(source)
 	if e != nil {
 		return "", nil, e
@@ -326,6 +339,21 @@ func sourceNames(ctx context.Context, source string, requireFiles bool) (string,
 			return nil
 		}
 		if excludedName(d.Name()) || protectedPath(p, configDir) {
+			if excluded != nil {
+				rel, _ := filepath.Rel(source, p)
+				reason := "credential, key or service-file policy"
+				if strings.HasPrefix(d.Name(), ".") {
+					reason = "hidden path"
+				}
+				if protectedPath(p, configDir) {
+					reason = "Nodi configuration and credentials"
+				}
+				if d.IsDir() {
+					rel += "/"
+					reason += " (entire directory excluded)"
+				}
+				*excluded = append(*excluded, Excluded{filepath.ToSlash(rel), reason})
+			}
 			if d.IsDir() {
 				return filepath.SkipDir
 			}

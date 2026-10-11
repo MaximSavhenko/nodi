@@ -54,7 +54,13 @@ def main(binary):
         cases = [(["nodi", "pub"], ["publish"]), (["nodi", "auth", "lo"], ["login", "logout"]),
                  (["nodi", "get", "nod"], ["nodi-demo"]),
                  (["nodi", "get", "nodi-demo", "--version", "0.1."], ["0.1.0", "0.1.1"]),
-                 (["nodi", "publish", "nodi-demo", "fi"], ["fixture parts"])]
+                 (["nodi", "publish", "nodi-demo", "fi"], ["fixture parts"]),
+                 (["nodi", "del"], ["delete"]), (["nodi", "upd"], ["update"]),
+                 (["nodi", "send", "fixture", "--n"], ["--name"]),
+                 (["nodi", "delete", "nod"], ["nodi-demo"]),
+                 (["nodi", "delete", "nodi-demo", "--version", "0.1."], ["0.1.0", "0.1.1"]),
+                 (["nodi", "delete", "nodi-demo", "--d"], ["--dry-run"]),
+                 (["nodi", "update", "--c"], ["--check"])]
         for words, expected in cases:
             code = f"source {shlex.quote(str(root / 'completion.bash'))}; COMP_WORDS=({' '.join(map(shlex.quote, words))}); COMP_CWORD={len(words)-1}; _nodi_complete; printf '%s\\n' \"${{COMPREPLY[@]}}\""
             got = subprocess.check_output(["/bin/bash", "-c", code], cwd=root, env=env, text=True).splitlines()
@@ -72,7 +78,9 @@ def main(binary):
                      "zle -N _nodi_capture; bindkey '^X^A' _nodi_capture\n")
             os.write(master, setup.encode())
             drain(master, 2)
-            for line, expected in [("nodi pub", "nodi publish"), ("nodi auth logi", "nodi auth login"),
+            for line, expected in [("nodi pub", "nodi publish"), ("nodi del", "nodi delete"),
+                                   ("nodi upd", "nodi update"), ("nodi send fixture --n", "nodi send fixture --name"),
+                                   ("nodi delete nod", "nodi delete nodi-demo"), ("nodi auth logi", "nodi auth login"),
                                    ("nodi get nod", "nodi get nodi-demo"),
                                    ("nodi get nodi-demo --version 0.1.1", "nodi get nodi-demo --version 0.1.1"),
                                    ("nodi publish nodi-demo fi", "fixture\\ parts/")]:

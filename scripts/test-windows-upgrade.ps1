@@ -1,4 +1,4 @@
-param([string]$Version = '0.3.0', [string]$BundleDirectory = 'dist', [string]$Go = 'go')
+param([string]$Version = '0.4.0', [string]$BundleDirectory = 'dist', [string]$Go = 'go')
 $ErrorActionPreference = 'Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') { throw 'Upgrade smoke requires a disposable Windows CI runner.' }
 $root = Join-Path $env:RUNNER_TEMP ('nodi-upgrade-' + [guid]::NewGuid().ToString('N'))
@@ -30,8 +30,8 @@ func must(e error){if e!=nil{panic(e)}}
     & $Go run .tools/upgrade-proof.go save
     if ($LASTEXITCODE -ne 0) { throw 'Credential fixture creation failed' }
     [IO.File]::WriteAllText("$root/downloads/user-edited.step", 'preserved recipient file')
-    & "$PSScriptRoot/install-windows.ps1" -Repository MaximSavhenko/nodi -Release v0.2.1 -InstallDirectory "$root/bin" -NoPath -NoCompletion
-    if ($LASTEXITCODE -ne 0 -or (& "$root/bin/nodi.exe" version) -cne 'nodi 0.2.1 windows/amd64') { throw 'Old installation failed' }
+    & "$PSScriptRoot/install-windows.ps1" -Repository MaximSavhenko/nodi -Release v0.3.0 -InstallDirectory "$root/bin" -NoPath -NoCompletion
+    if ($LASTEXITCODE -ne 0 -or (& "$root/bin/nodi.exe" version) -cne 'nodi 0.3.0 windows/amd64') { throw 'Old installation failed' }
     $before = @{}
     foreach ($file in Get-ChildItem -LiteralPath "$root/config","$root/downloads" -Recurse -File) {
         $before[$file.FullName] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
@@ -45,7 +45,7 @@ func must(e error){if e!=nil{panic(e)}}
     if ($LASTEXITCODE -ne 0) { throw 'Saved credential decoding failed' }
     & "$root/bin/nodi.exe" help
     if ($LASTEXITCODE -ne 0) { throw 'Upgraded help failed' }
-    Write-Output "PASS: real Windows installer upgrade 0.2.1 -> $Version, settings/credentials/download preservation"
+    Write-Output "PASS: real Windows installer upgrade 0.3.0 -> $Version, settings/credentials/download preservation"
 } finally {
     $env:NODI_CONFIG_DIR = $savedConfig; $env:NODI_READ_TOKEN = $savedRead; $env:NODI_WRITE_TOKEN = $savedWrite
     # Keep the disposable runner's evidence; do not clean user data or profiles.

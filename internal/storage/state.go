@@ -101,6 +101,15 @@ func (g *GitHub) State(ctx context.Context, project string) (ProjectState, error
 		}
 		state.Manifest = &m
 	}
+	used, e := g.tombstones(ctx, project)
+	if e != nil {
+		return state, e
+	}
+	for version := range used {
+		if state.Version == "" || model.CompareVersion(version, state.Version) > 0 {
+			state.Version = version
+		}
+	}
 	return state, nil
 }
 func (g *GitHub) reserveTag(ctx context.Context, tag string) error {

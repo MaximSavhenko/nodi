@@ -1,18 +1,18 @@
 class Nodi < Formula
   desc "Private engineering package transport via GitHub Releases"
   homepage "https://github.com/MaximSavhenko/nodi"
-  version "0.3.0"
+  version "0.4.0"
   license "MIT"
   depends_on :macos
 
   on_macos do
     on_arm do
-      url "https://github.com/MaximSavhenko/nodi/releases/download/v0.3.0/nodi-darwin-arm64.zip"
-      sha256 "d356de6ad10b4f4696ac73ceb2c0b83c898750ca1ddefa8a4405e7fb5be77721"
+      url "https://github.com/MaximSavhenko/nodi/releases/download/v0.4.0/nodi-darwin-arm64.zip"
+      sha256 "fffadd1d9226fd95225f9d531a36d059bbfe8d78cd6a411af8303bac84197ced"
     end
     on_intel do
-      url "https://github.com/MaximSavhenko/nodi/releases/download/v0.3.0/nodi-darwin-amd64.zip"
-      sha256 "82de9f750a1bc3d392d72cf5f17800bbfba47c215875f960d8a8064def67c874"
+      url "https://github.com/MaximSavhenko/nodi/releases/download/v0.4.0/nodi-darwin-amd64.zip"
+      sha256 "2c085aedff831e2100ca847a50dc33b763697aaf34a7a8afcb91f8d0d89fc1c4"
     end
   end
 

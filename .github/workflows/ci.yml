@@ -31,7 +31,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
         run: |
-          $version = '0.3.0'
+          $version = '0.4.0'
           if ($env:REF_TYPE -eq 'tag') {
             if ($env:REF_NAME -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Only stable version tags can be released.' }
             $version = $env:REF_NAME.Substring(1)
@@ -100,6 +100,9 @@ jobs:
       - name: Test actual bash and zsh completion widgets
         if: runner.os == 'macOS'
         run: python3 scripts/test-shell-completion.py './dist/nodi-${{ matrix.platform }}'
+      - name: Upgrade macOS 0.3.0 and preserve user data
+        if: runner.os == 'macOS'
+        run: bash scripts/test-macos-upgrade.sh '${{ needs.build.outputs.version }}' "$PWD/dist"
       - name: Test fresh PowerShell 5.1 and 7 startup with real profiles
         if: runner.os == 'Windows'
         shell: pwsh
@@ -188,7 +191,7 @@ jobs:
             echo 'A release for this tag already exists; replacement is forbidden.' >&2
             exit 1
           fi
-          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Nodi $RELEASE_TAG" --notes 'Simple send PATH -> get PROJECT. Released packages are available immediately and verified with SHA-256. Persistent completion, legacy schema-1 packages and separate saved read/write credentials are preserved. Confirmed native runtime and Go tests: Windows amd64, macOS ARM64/Intel; see validation.json for source commit and CI evidence. Physical acceptance on the user Windows and Mac is still required. MIT licensed.' dist/nodi-windows-amd64.exe dist/nodi-windows-amd64.zip dist/nodi-darwin-arm64 dist/nodi-darwin-arm64.zip dist/nodi-darwin-amd64 dist/nodi-darwin-amd64.zip dist/SHA256SUMS dist/nodi.rb dist/winget-manifests.zip dist/validation.json scripts/install-windows.ps1 scripts/install-macos.sh LICENSE
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Nodi $RELEASE_TAG" --notes-file docs/RELEASE-0.4.0.md dist/nodi-windows-amd64.exe dist/nodi-windows-amd64.zip dist/nodi-darwin-arm64 dist/nodi-darwin-arm64.zip dist/nodi-darwin-amd64 dist/nodi-darwin-amd64.zip dist/SHA256SUMS dist/nodi.rb dist/winget-manifests.zip dist/validation.json scripts/install-windows.ps1 scripts/install-macos.sh LICENSE
           gh release edit "$RELEASE_TAG" --draft=false --latest
   winget-install:
     if: startsWith(github.ref, 'refs/tags/v')

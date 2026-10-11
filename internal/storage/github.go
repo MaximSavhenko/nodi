@@ -43,9 +43,9 @@ type APIError struct{ Status int }
 func (e *APIError) Error() string {
 	switch e.Status {
 	case 401:
-		return "GitHub authentication failed (401): check token"
+		return "GitHub authentication failed (401): run nodi setup to replace the read token, or nodi setup --write for sending/deletion"
 	case 403:
-		return "GitHub access denied or rate limited (403): check repository permissions/rate limit"
+		return "GitHub access denied or rate limited (403): run nodi setup --check; verify token repository permissions or retry after the rate limit resets"
 	case 404:
 		return "GitHub resource unavailable (404): check repository, project and token access"
 	case 422:
@@ -122,7 +122,7 @@ func (g *GitHub) request(ctx context.Context, method, endpoint, contentType stri
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, fmt.Errorf("GitHub network or TLS request failed; check connectivity and retry")
+		return nil, fmt.Errorf("GitHub network or TLS request failed; restore connectivity, run nodi setup --check and retry the command")
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		res.Body.Close()
@@ -427,6 +427,15 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 	if e := g.VerifyPrivate(ctx); e != nil {
 		return e
 	}
+	used, e := g.tombstones(ctx, m.Project)
+	if e != nil {
+		return e
+	}
+	for version := range used {
+		if model.CompareVersion(m.Version, version) <= 0 {
+			return fmt.Errorf("version %s was deleted or predates deletion history %s; choose a newer version", m.Version, version)
+		}
+	}
 	hash, size, e := archive.HashFile(name)
 	if e != nil {
 		return e
@@ -443,6 +452,9 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 	for _, r := range rs {
 		if r.Tag == model.Tag(m.Project, m.Version) {
 			return fmt.Errorf("version already exists (including draft); choose a new version")
+		}
+		if p, v, ok := model.ParseTag(r.Tag); ok && p == m.Project && model.CompareVersion(m.Version, v) <= 0 {
+			return fmt.Errorf("version must be newer than existing %s; choose a newer --version or use nodi send PATH", v)
 		}
 	}
 	var ref any

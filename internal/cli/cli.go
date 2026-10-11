@@ -22,18 +22,20 @@ import (
 )
 
 type App struct {
-	Version  string
-	In       io.Reader
-	Out      io.Writer
-	Store    func(bool) (storage.Store, error)
-	StoreFor func(string, bool) (storage.Store, error)
-	Connect  func(string, string) (storage.Store, error)
-	Cwd      func() (string, error)
-	Open     func(string) error
+	Version      string
+	In           io.Reader
+	Out          io.Writer
+	Store        func(bool) (storage.Store, error)
+	StoreFor     func(string, bool) (storage.Store, error)
+	Connect      func(string, string) (storage.Store, error)
+	Cwd          func() (string, error)
+	Open         func(string) error
+	LatestStable func(context.Context) (string, error)
 }
 
 func New(version string, in io.Reader, out io.Writer) *App {
 	a := &App{Version: version, In: in, Out: out, Open: local.Open, Cwd: os.Getwd}
+	a.LatestStable = storage.LatestCLIRelease
 	a.Connect = func(repo, token string) (storage.Store, error) { return storage.NewGitHub(repo, token) }
 	a.StoreFor = func(repo string, write bool) (storage.Store, error) {
 		t, e := config.Token(write)
@@ -53,10 +55,12 @@ func New(version string, in io.Reader, out io.Writer) *App {
 }
 
 type options struct {
-	version, output, status, description, metadata, repo string
-	all, write, minor, major                             bool
-	draft                                                bool
-	args                                                 []string
+	version, output, status, description, metadata, repo, name string
+	dryRun, check                                              bool
+	ownsName                                                   bool
+	all, write, minor, major                                   bool
+	draft                                                      bool
+	args                                                       []string
 }
 
 func parse(command string, args []string) (options, error) {
@@ -76,6 +80,14 @@ func parse(command string, args []string) (options, error) {
 		fs.BoolVar(&o.major, "major", false, "increment major version")
 		fs.BoolVar(&o.draft, "draft", false, "create an unpublished draft")
 	case "send":
+		fs.StringVar(&o.name, "name", "", "independent package name")
+		fs.BoolVar(&o.dryRun, "dry-run", false, "read-only preview")
+	case "delete":
+		fs.StringVar(&o.version, "version", "", "exact version")
+		fs.BoolVar(&o.all, "all", false, "all versions of this exact project")
+		fs.BoolVar(&o.dryRun, "dry-run", false, "read-only preview")
+	case "update":
+		fs.BoolVar(&o.check, "check", false, "check latest stable CLI version")
 	case "list", "info":
 		fs.BoolVar(&o.all, "all", false, "include drafts (write credential)")
 	case "config":
@@ -127,7 +139,7 @@ func parse(command string, args []string) (options, error) {
 		return o, e
 	}
 	o.args = pos
-	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "send": 1, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0, "init": 1, "status": 0}
+	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "send": 1, "delete": 1, "update": 0, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0, "init": 1, "status": 0}
 	if len(pos) != counts[command] && !(command == "publish" && len(pos) == 0) {
 		return o, fmt.Errorf("%s expects %d positional arguments; run nodi help", command, counts[command])
 	}
@@ -140,6 +152,17 @@ func parse(command string, args []string) (options, error) {
 		if e := model.ValidateVersion(o.version); e != nil {
 			return o, e
 		}
+	}
+	if o.name != "" {
+		if e := model.ValidateProject(o.name); e != nil {
+			return o, e
+		}
+	}
+	if command == "delete" && (o.all == (o.version != "")) {
+		return o, fmt.Errorf("choose exactly one: nodi delete PROJECT --version VERSION or nodi delete PROJECT --all")
+	}
+	if command == "update" && !o.check {
+		return o, fmt.Errorf("use nodi update --check; automatic updates are not supported")
 	}
 	if command == "publish" {
 		if o.minor && o.major || (o.version != "" && (o.minor || o.major)) {
@@ -175,7 +198,12 @@ const help = `Nodi — private file delivery via GitHub Releases
                                  Configure and verify separate read/write access
   nodi setup --completion [--check]
                                  Persistent completion (asks before profile edits)
-  nodi send PATH                  Send a file or directory; automatic version
+  nodi send PATH [--name PROJECT] [--dry-run]
+                                 Independent file/directory; automatic version
+  nodi delete PROJECT --version VERSION [--dry-run]
+  nodi delete PROJECT --all [--dry-run]
+                                 Write credential; exact typed confirmation
+  nodi update --check             Installed and latest stable CLI version
   nodi init PROJECT [--repo OWNER/PRIVATE-REPO]
   nodi status                     Read-only local/remote SHA-256 comparison
   nodi publish [--minor|--major]   Bound project; published by default, no prompt
@@ -324,7 +352,13 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return nil
 	}
 	if cmd == "send" {
-		return a.send(ctx, o.args[0])
+		return a.send(ctx, o.args[0], o)
+	}
+	if cmd == "delete" {
+		return a.deletePackage(ctx, o)
+	}
+	if cmd == "update" {
+		return a.updateCheck(ctx)
 	}
 	if cmd == "publish" {
 		if len(o.args) == 0 {
