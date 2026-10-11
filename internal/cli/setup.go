@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -249,7 +250,16 @@ func appendProfile(path string, before []byte, text, encoding, block string) (st
 	return backup, f.Sync()
 }
 
-func psQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+func psQuote(s string) string {
+	for _, r := range s {
+		if r > 127 {
+			// An existing BOM-less ASCII profile is read as ANSI by PowerShell 5.1.
+			// Keep the appended block ASCII even when the installation path is Unicode.
+			return "([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + base64.StdEncoding.EncodeToString([]byte(s)) + "')))"
+		}
+	}
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
 func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'" }
 
 func powershellSetupBlock(executable string) string {

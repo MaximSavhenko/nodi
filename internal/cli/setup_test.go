@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,6 +155,16 @@ func TestZshSetupUsesNativeHomebrewAndStablePaths(t *testing.T) {
 	}
 	if psQuote("C:\\user's\\nodi.exe") != "'C:\\user''s\\nodi.exe'" || shQuote("user's") != "'user'\\''s'" {
 		t.Fatal("unsafe quoting")
+	}
+	unicodePath := "C:\\Users\\Пользователь\\nodi.exe"
+	quoted := psQuote(unicodePath)
+	if !strings.Contains(quoted, base64.StdEncoding.EncodeToString([]byte(unicodePath))) {
+		t.Fatal("Unicode path is not preserved", quoted)
+	}
+	for _, r := range powershellSetupBlock(unicodePath) {
+		if r > 127 {
+			t.Fatal("BOM-less PowerShell 5.1 profile would misread Unicode path")
+		}
 	}
 }
 
