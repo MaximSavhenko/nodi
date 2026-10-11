@@ -1,6 +1,6 @@
 param(
     [string]$Go = 'go',
-    [string]$Version = '0.2.1'
+    [string]$Version = '0.3.0'
 )
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version must be MAJOR.MINOR.PATCH' }

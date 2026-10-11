@@ -1,4 +1,4 @@
-param([string]$Version = '0.2.1', [string]$Owner = 'MaximSavhenko')
+param([string]$Version = '0.3.0', [string]$Owner = 'MaximSavhenko')
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+$' -or $Owner -notmatch '^[A-Za-z0-9-]+$') { throw 'Invalid release identity.' }
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') { throw 'This installation smoke is restricted to disposable Windows CI runners.' }
