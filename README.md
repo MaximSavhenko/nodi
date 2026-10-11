@@ -10,7 +10,7 @@ Nodi передаёт инженерные пакеты между Windows и ma
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
-Версия 0.2.1 добавляет Tab completion, локальную привязку проекта, SHA-256 status и публикацию с автоматическим версионированием. Результаты и статус выпуска: [NODI-03](docs/NODI-03-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает принятия CLA владельцем и проверки Microsoft, manifest 0.2.1 готовится отдельно и не заменяет существующий PR.
+Стабильная [версия 0.2.1](https://github.com/MaximSavhenko/nodi/releases/tag/v0.2.1) добавляет Tab completion, локальную привязку проекта, SHA-256 status и публикацию с автоматическим версионированием. Windows и обе архитектуры macOS, Homebrew upgrade 0.1.0 → 0.2.1 и приватная передача Mac → Windows прошли проверки: [NODI-03](docs/NODI-03-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает CLA владельца и проверки Microsoft, manifests 0.2.0/0.2.1 подготовлены отдельно и не заменяют существующий PR.
 
 macOS, Apple Silicon и Intel:
 
@@ -35,7 +35,7 @@ winget upgrade --id MaximSavhenko.Nodi --exact --source winget
 winget uninstall --id MaximSavhenko.Nodi --exact
 ```
 
-WinGet управляет portable ZIP, командой `nodi` в PATH, установленной версией и удалением. Если команда пока не находится в официальном источнике, используйте терминальный установщик ниже. Локальная проверка manifest и установка из manifest не означают доступность пакета в каталоге Microsoft. Актуальные ссылки на релиз, PR и результаты проверок: [docs/NODI-02-STATUS.md](docs/NODI-02-STATUS.md).
+WinGet управляет portable ZIP, командой `nodi` в PATH, установленной версией и удалением. Пока пакет не находится в официальном источнике, используйте терминальный установщик ниже. Локальная проверка manifest и установка из manifest не означают доступность пакета в каталоге Microsoft. Актуальные результаты: [NODI-03](docs/NODI-03-STATUS.md); история первого выпуска: [NODI-02](docs/NODI-02-STATUS.md).
 
 При переходе с терминального установщика на winget удалите прежний `%LOCALAPPDATA%\Nodi\bin\nodi.exe` и его запись пользовательского PATH по инструкции удаления ниже. Затем установите пакет через winget и откройте новый терминал. Так обновления winget будут запускать управляемый им бинарник; скачанные проекты и конфигурация сохранятся.
 
@@ -132,7 +132,7 @@ nodi version
 
 Установка: `~/.local/bin/nodi`; shell profiles по умолчанию не изменяются. Для текущего терминала используйте `export PATH` выше. Только явный `--add-path` разрешает установщику добавить строку PATH в `~/.zprofile`; completion подключается отдельно. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-Сетевые режимы версии 0.2.1 (доступны после подтверждённого выпуска; статус — в отчёте NODI-03):
+Установка или обновление до подтверждённой версии 0.2.1:
 
 ```powershell
 .\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.2.1
