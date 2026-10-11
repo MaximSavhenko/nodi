@@ -22,7 +22,14 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 foreach ($target in @(@('nodi-windows-amd64.exe','nodi.exe','nodi-windows-amd64.zip'),@('nodi-darwin-arm64','nodi-darwin-arm64','nodi-darwin-arm64.zip'),@('nodi-darwin-amd64','nodi-darwin-amd64','nodi-darwin-amd64.zip'))) {
     $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $DistributionDirectory $target[2]))
     try {
-        if ($zip.Entries.Count -ne 2 -or -not $zip.GetEntry($target[1]) -or -not $zip.GetEntry('LICENSE')) { throw 'Unexpected release ZIP contents.' }
+        if ($zip.Entries.Count -ne 5 -or -not $zip.GetEntry($target[1]) -or -not $zip.GetEntry('LICENSE')) { throw 'Unexpected release ZIP contents.' }
+        foreach ($completionName in @('nodi.bash','_nodi','nodi.ps1')) {
+            $entry=$zip.GetEntry("completion/$completionName")
+            if (-not $entry) { throw 'Missing shell completion in release ZIP.' }
+            $reader=[IO.StreamReader]::new($entry.Open())
+            try { $contents=$reader.ReadToEnd() } finally { $reader.Dispose() }
+            if ($contents -cne [IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot -Parent) "internal/cli/shells/$completionName"))) { throw 'Unexpected completion script contents.' }
+        }
         $stream = $zip.GetEntry($target[1]).Open(); $sha = [Security.Cryptography.SHA256]::Create()
         try { $entryHash = ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose(); $stream.Dispose() }
         $binaryHash = (Get-FileHash -LiteralPath (Join-Path $DistributionDirectory $target[0]) -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -40,6 +47,9 @@ if (-not $SkipRuntime) {
         if ($Platform -eq 'windows-amd64') { $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot" } else { & /bin/chmod +x $binary; $env:PATH = '/usr/bin:/bin:/usr/sbin:/sbin' }
         $actualVersion = (& $binary version).Trim()
         if ($LASTEXITCODE -ne 0 -or $actualVersion -cne "nodi $Version $($Platform.Replace('-','/'))") { throw "Unexpected runtime version: $actualVersion" }
+        foreach ($alias in @('-v','--version')) {
+            if ((& $binary $alias).Trim() -cne $actualVersion -or $LASTEXITCODE -ne 0) { throw 'Runtime version alias failed.' }
+        }
         $helpOutput = & $binary help
         if ($LASTEXITCODE -ne 0 -or ($helpOutput -join "`n") -notmatch 'nodi get') { throw 'Runtime help check failed.' }
     } finally { $env:PATH = $savedPath }

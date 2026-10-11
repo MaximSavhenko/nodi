@@ -37,10 +37,11 @@ type GitHub struct {
 	CorruptArchive bool
 	ForceStatus    int
 	Requests       []string
+	tags           map[string]string
 }
 
 func NewGitHub() *GitHub {
-	g := &GitHub{Private: true, data: map[int64][]byte{}, next: 1}
+	g := &GitHub{Private: true, data: map[int64][]byte{}, next: 1, tags: map[string]string{}}
 	g.Server = httptest.NewTLSServer(http.HandlerFunc(g.serve))
 	return g
 }
@@ -71,10 +72,47 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	respond := func(v any) { w.Header().Set("Content-Type", "application/json"); json.NewEncoder(w).Encode(v) }
 	if p == "" {
-		respond(map[string]bool{"private": g.Private})
+		respond(map[string]any{"private": g.Private, "default_branch": "main"})
+		return
+	}
+	if p == "/git/ref/heads/main" {
+		respond(map[string]any{"ref": "refs/heads/main", "object": map[string]string{"sha": strings.Repeat("a", 40)}})
+		return
+	}
+	if strings.HasPrefix(p, "/git/matching-refs/tags/") {
+		refs := []any{}
+		prefix := "refs/tags/" + strings.TrimPrefix(p, "/git/matching-refs/tags/")
+		for ref, sha := range g.tags {
+			if strings.HasPrefix(ref, prefix) {
+				refs = append(refs, map[string]any{"ref": ref, "object": map[string]string{"sha": sha}})
+			}
+		}
+		respond(refs)
+		return
+	}
+	if p == "/git/refs" && r.Method == "POST" {
+		var input struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		}
+		if json.NewDecoder(r.Body).Decode(&input) != nil {
+			w.WriteHeader(400)
+			return
+		}
+		if _, ok := g.tags[input.Ref]; ok {
+			w.WriteHeader(422)
+			return
+		}
+		g.tags[input.Ref] = input.SHA
+		respond(map[string]any{"ref": input.Ref, "object": map[string]string{"sha": input.SHA}})
 		return
 	}
 	if strings.HasPrefix(p, "/git/ref/") {
+		ref := "refs/" + strings.TrimPrefix(p, "/git/ref/")
+		if sha, ok := g.tags[ref]; ok {
+			respond(map[string]any{"ref": ref, "object": map[string]string{"sha": sha}})
+			return
+		}
 		w.WriteHeader(404)
 		return
 	}

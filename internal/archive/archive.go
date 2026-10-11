@@ -53,67 +53,10 @@ func Prepare(ctx context.Context, source, project, version, status, description 
 	if status != "draft" && status != "released" {
 		return m, "", fmt.Errorf("choose --status draft or --status released explicitly")
 	}
-	source, e := filepath.Abs(source)
+	source, names, e := sourceNames(ctx, source, true)
 	if e != nil {
 		return m, "", e
 	}
-	root, e := os.Lstat(source)
-	if e != nil {
-		return m, "", e
-	}
-	if !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
-		return m, "", fmt.Errorf("source must be a real directory")
-	}
-	if e = CheckParents(source); e != nil {
-		return m, "", e
-	}
-	var names []string
-	e = filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if e := ctx.Err(); e != nil {
-			return e
-		}
-		if p == source {
-			return nil
-		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("symbolic links are not allowed: %s", p)
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !formats[strings.ToLower(filepath.Ext(d.Name()))] {
-			return nil
-		}
-		if strings.HasPrefix(d.Name(), ".") {
-			return nil
-		}
-		rel, e := filepath.Rel(source, p)
-		if e != nil {
-			return e
-		}
-		rel = filepath.ToSlash(rel)
-		if e = model.SafePath(rel); e != nil {
-			return e
-		}
-		names = append(names, rel)
-		if len(names) > model.MaxFiles {
-			return fmt.Errorf("too many files")
-		}
-		return nil
-	})
-	if e != nil {
-		return m, "", e
-	}
-	if len(names) == 0 {
-		return m, "", fmt.Errorf("no supported manufacturing files (DXF, PDF, STEP, IGES, STL, 3MF, SVG, DWG)")
-	}
-	sort.Strings(names)
 	out, e := os.CreateTemp("", "nodi-package-*.zip")
 	if e != nil {
 		return m, "", e
@@ -331,4 +274,69 @@ func Extract(ctx context.Context, name string, m model.Manifest, destination str
 	}
 	success = true
 	return nil
+}
+
+func sourceNames(ctx context.Context, source string, requireFiles bool) (string, []string, error) {
+	source, e := filepath.Abs(source)
+	if e != nil {
+		return "", nil, e
+	}
+	root, e := os.Lstat(source)
+	if e != nil {
+		return "", nil, e
+	}
+	if !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
+		return "", nil, fmt.Errorf("source must be a real directory")
+	}
+	if e = CheckParents(source); e != nil {
+		return "", nil, e
+	}
+	var names []string
+	e = filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if e := ctx.Err(); e != nil {
+			return e
+		}
+		if p == source {
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symbolic links are not allowed: %s", p)
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !formats[strings.ToLower(filepath.Ext(d.Name()))] {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			return nil
+		}
+		rel, e := filepath.Rel(source, p)
+		if e != nil {
+			return e
+		}
+		rel = filepath.ToSlash(rel)
+		if e = model.SafePath(rel); e != nil {
+			return e
+		}
+		names = append(names, rel)
+		if len(names) > model.MaxFiles {
+			return fmt.Errorf("too many files")
+		}
+		return nil
+	})
+	if e != nil {
+		return "", nil, e
+	}
+	if len(names) == 0 && requireFiles {
+		return "", nil, fmt.Errorf("no supported manufacturing files (DXF, PDF, STEP, IGES, STL, 3MF, SVG, DWG)")
+	}
+	sort.Strings(names)
+	return source, names, nil
 }

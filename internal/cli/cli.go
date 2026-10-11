@@ -20,30 +20,37 @@ import (
 )
 
 type App struct {
-	Version string
-	In      io.Reader
-	Out     io.Writer
-	Store   func(bool) (storage.Store, error)
-	Open    func(string) error
+	Version  string
+	In       io.Reader
+	Out      io.Writer
+	Store    func(bool) (storage.Store, error)
+	StoreFor func(string, bool) (storage.Store, error)
+	Cwd      func() (string, error)
+	Open     func(string) error
 }
 
 func New(version string, in io.Reader, out io.Writer) *App {
-	return &App{Version: version, In: in, Out: out, Open: local.Open, Store: func(write bool) (storage.Store, error) {
-		c, e := config.Load()
-		if e != nil {
-			return nil, e
-		}
+	a := &App{Version: version, In: in, Out: out, Open: local.Open, Cwd: os.Getwd}
+	a.StoreFor = func(repo string, write bool) (storage.Store, error) {
 		t, e := config.Token(write)
 		if e != nil {
 			return nil, e
 		}
-		return storage.NewGitHub(c.Repository, t)
-	}}
+		return storage.NewGitHub(repo, t)
+	}
+	a.Store = func(write bool) (storage.Store, error) {
+		c, e := config.Load()
+		if e != nil {
+			return nil, e
+		}
+		return a.StoreFor(c.Repository, write)
+	}
+	return a
 }
 
 type options struct {
 	version, output, status, description, metadata, repo string
-	all, write                                           bool
+	all, write, minor, major                             bool
 	args                                                 []string
 }
 
@@ -60,13 +67,17 @@ func parse(command string, args []string) (options, error) {
 		fs.StringVar(&o.status, "status", "", "draft or released")
 		fs.StringVar(&o.description, "description", "", "description")
 		fs.StringVar(&o.metadata, "metadata", "", "JSON file")
+		fs.BoolVar(&o.minor, "minor", false, "increment minor version")
+		fs.BoolVar(&o.major, "major", false, "increment major version")
 	case "list", "info":
 		fs.BoolVar(&o.all, "all", false, "include drafts (write credential)")
 	case "config":
 		fs.StringVar(&o.repo, "repo", "", "OWNER/REPO")
+	case "init":
+		fs.StringVar(&o.repo, "repo", "", "OWNER/REPO")
 	case "auth-login":
 		fs.BoolVar(&o.write, "write", false, "store publish token")
-	case "version", "help", "open", "auth-logout":
+	case "version", "help", "open", "auth-logout", "status":
 	default:
 		return o, fmt.Errorf("unknown command %q; run nodi help", command)
 	}
@@ -109,8 +120,8 @@ func parse(command string, args []string) (options, error) {
 		return o, e
 	}
 	o.args = pos
-	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0}
-	if len(pos) != counts[command] {
+	counts := map[string]int{"version": 0, "help": 0, "list": 0, "info": 1, "get": 1, "publish": 2, "open": 1, "config": 0, "auth-login": 0, "auth-logout": 0, "init": 1, "status": 0}
+	if len(pos) != counts[command] && !(command == "publish" && len(pos) == 0) {
 		return o, fmt.Errorf("%s expects %d positional arguments; run nodi help", command, counts[command])
 	}
 	if len(pos) > 0 {
@@ -124,8 +135,17 @@ func parse(command string, args []string) (options, error) {
 		}
 	}
 	if command == "publish" {
-		if o.version == "" {
+		if o.minor && o.major || (o.version != "" && (o.minor || o.major)) {
+			return o, fmt.Errorf("choose only one of --version, --minor or --major")
+		}
+		if len(pos) == 2 && (o.minor || o.major) {
+			return o, fmt.Errorf("--minor/--major require initialized-project publication")
+		}
+		if len(pos) == 2 && o.version == "" {
 			return o, fmt.Errorf("publish requires --version MAJOR.MINOR.PATCH")
+		}
+		if len(pos) == 0 && o.status == "" {
+			o.status = "draft"
 		}
 		if o.status != "draft" && o.status != "released" {
 			return o, fmt.Errorf("publish requires explicit --status draft or --status released")
@@ -134,9 +154,14 @@ func parse(command string, args []string) (options, error) {
 	return o, nil
 }
 
-const help = `Nodi 0.1 — private engineering packages via GitHub Releases
+const help = `Nodi — private engineering packages via GitHub Releases
 
-  nodi version
+  nodi version | nodi -v | nodi --version
+  nodi completion [zsh|bash|powershell]
+  nodi init PROJECT [--repo OWNER/PRIVATE-REPO]
+  nodi status                     Read-only local/remote SHA-256 comparison
+  nodi publish [--minor|--major]   Preview, confirm; default draft
+  nodi publish --status released  Explicit manufacturing-publication confirmation
   nodi config --repo OWNER/PRIVATE-REPO
   nodi auth login                 Read token from hidden stdin
   nodi auth login --write         Separate publication token
@@ -153,7 +178,9 @@ const help = `Nodi 0.1 — private engineering packages via GitHub Releases
 Default destination: Desktop/Nodi/PROJECT/VERSION.
 --output is the exact new destination directory. Existing paths are refused.
 --all needs a write token because GitHub hides drafts from read-only users.
-Publishing requires an explicit status; released is not CAD/manufacturing validation.
+Automatic publication finds .nodi/project.json in this or an ancestor folder.
+Drafts count towards versions; no changes creates no release. Legacy explicit syntax is preserved.
+released is not CAD/manufacturing validation. Completion never edits shell profiles.
 Versions: MAJOR.MINOR.PATCH, without a prefix. Projects: lowercase letters/digits/hyphens.
 `
 
@@ -164,10 +191,30 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	}
 	cmd := args[0]
 	rest := args[1:]
+	if cmd == "__complete" {
+		if len(rest) == 1 && rest[0] == "--json" {
+			if json.NewDecoder(io.LimitReader(a.In, 65536)).Decode(&rest) != nil {
+				return nil
+			}
+		}
+		if len(rest) > 256 {
+			return nil
+		}
+		for _, word := range rest {
+			if len(word) > 4096 {
+				return nil
+			}
+		}
+		a.complete(ctx, rest)
+		return nil
+	}
+	if cmd == "completion" {
+		return a.completion(rest)
+	}
 	if cmd == "--help" || cmd == "-h" {
 		cmd = "help"
 	}
-	if cmd == "--version" {
+	if cmd == "--version" || cmd == "-v" {
 		cmd = "version"
 	}
 	if cmd == "auth" {
@@ -227,6 +274,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintln(a.Out, "Saved credentials removed.")
 		return nil
+	case "init":
+		return a.initProject(o)
+	case "status":
+		return a.projectStatus(ctx)
 	case "open":
 		c, e := config.Load()
 		if e != nil {
@@ -243,6 +294,9 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		return nil
 	}
 	if cmd == "publish" {
+		if len(o.args) == 0 {
+			return a.autoPublish(ctx, o)
+		}
 		return a.publish(ctx, o)
 	}
 	store, e := a.Store(o.all)

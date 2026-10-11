@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.2.0',
     [string]$Owner = 'MaximSavhenko',
     [string]$License = 'MIT',
     [string]$DistributionDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) 'dist'),
@@ -13,11 +13,17 @@ $releaseBase = "https://github.com/$Owner/nodi/releases/download/v$Version"
 $packageId = "$Owner.Nodi"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+New-Item -ItemType Directory -Force (Join-Path $DistributionDirectory 'completion') | Out-Null
+foreach ($completionName in @('nodi.bash','_nodi','nodi.ps1')) {
+    Copy-Item -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) "internal/cli/shells/$completionName") -Destination (Join-Path $DistributionDirectory "completion/$completionName")
+}
 foreach ($target in @(@('nodi-windows-amd64.exe','nodi.exe','nodi-windows-amd64.zip'),@('nodi-darwin-arm64','nodi-darwin-arm64','nodi-darwin-arm64.zip'),@('nodi-darwin-amd64','nodi-darwin-amd64','nodi-darwin-amd64.zip'))) {
     $zipStream = [IO.File]::Open((Join-Path $DistributionDirectory $target[2]), [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite)
     $zip = [IO.Compression.ZipArchive]::new($zipStream, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($content in @(@((Join-Path $DistributionDirectory $target[0]),$target[1]),@((Join-Path (Split-Path $PSScriptRoot -Parent) 'LICENSE'),'LICENSE'))) {
+        $contents = @(@((Join-Path $DistributionDirectory $target[0]),$target[1]),@((Join-Path (Split-Path $PSScriptRoot -Parent) 'LICENSE'),'LICENSE'))
+        foreach ($completionName in @('nodi.bash','_nodi','nodi.ps1')) { $contents += ,@((Join-Path $DistributionDirectory "completion/$completionName"),"completion/$completionName") }
+        foreach ($content in $contents) {
             $entry = $zip.CreateEntry($content[1], [IO.Compression.CompressionLevel]::NoCompression)
             $entry.LastWriteTime = [DateTimeOffset]::new(1980,1,1,0,0,0,[TimeSpan]::Zero)
             $inputStream = [IO.File]::OpenRead($content[0]); $outputStream = $entry.Open()
@@ -66,6 +72,9 @@ class Nodi < Formula
     bin.install "nodi-darwin-#{arch}" => "nodi"
     chmod 0755, bin/"nodi"
     pkgshare.install "LICENSE"
+    bash_completion.install "completion/nodi.bash" => "nodi"
+    zsh_completion.install "completion/_nodi"
+    pkgshare.install "completion/nodi.ps1"
   end
 
   test do

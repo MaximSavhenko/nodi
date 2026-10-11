@@ -407,9 +407,13 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 		return fmt.Errorf("package size changed before publication")
 	}
 	input := map[string]any{"tag_name": model.Tag(m.Project, m.Version), "name": m.Project + " " + m.Version, "body": "Nodi schema 1. Status: " + m.Status + ".\n" + m.Description, "draft": true, "prerelease": m.Status == "draft", "make_latest": "false"}
+	// Git refs are created atomically. Draft releases alone do not reserve a tag.
+	if e = g.reserveTag(ctx, model.Tag(m.Project, m.Version)); e != nil {
+		return e
+	}
 	var r release
 	if e = g.json(ctx, "POST", g.endpoint("/releases"), input, &r); e != nil {
-		return e
+		return fmt.Errorf("release creation was not confirmed; reserved tag retained; inspect GitHub before retrying: %w", e)
 	}
 	if r.ID <= 0 {
 		return fmt.Errorf("GitHub returned an invalid release")

@@ -1,4 +1,4 @@
-# Nodi CLI 0.1
+# Nodi CLI 0.2
 
 Nodi передаёт инженерные пакеты между Windows и macOS через приватный репозиторий GitHub и его Releases. На компьютере получателя нужны только Nodi и доступ в интернет. CAD, Git, Go, VPN и домашний сервер не нужны.
 
@@ -10,7 +10,7 @@ Nodi передаёт инженерные пакеты между Windows и ma
 - [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
 - [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
 
-Опубликован [стабильный Nodi 0.1.0](https://github.com/MaximSavhenko/nodi/releases/tag/v0.1.0). Homebrew проверен на Apple Silicon и Intel. [Winget PR #450627](https://github.com/microsoft/winget-pkgs/pull/450627) ожидает принятия Contributor License Agreement владельцем аккаунта и проверки Microsoft; установка из официального источника пока не подтверждена.
+Версия 0.2.0 добавляет Tab completion, локальную привязку проекта, SHA-256 status и публикацию с автоматическим версионированием. Результаты и статус выпуска: [NODI-03](docs/NODI-03-STATUS.md). [Winget PR 0.1.0 #450627](https://github.com/microsoft/winget-pkgs/pull/450627) сохранён; пока он ожидает принятия CLA владельцем и проверки Microsoft, manifest 0.2.0 готовится отдельно и не заменяет существующий PR.
 
 macOS, Apple Silicon и Intel:
 
@@ -38,6 +38,66 @@ winget uninstall --id MaximSavhenko.Nodi --exact
 WinGet управляет portable ZIP, командой `nodi` в PATH, установленной версией и удалением. Если команда пока не находится в официальном источнике, используйте терминальный установщик ниже. Локальная проверка manifest и установка из manifest не означают доступность пакета в каталоге Microsoft. Актуальные ссылки на релиз, PR и результаты проверок: [docs/NODI-02-STATUS.md](docs/NODI-02-STATUS.md).
 
 При переходе с терминального установщика на winget удалите прежний `%LOCALAPPDATA%\Nodi\bin\nodi.exe` и его запись пользовательского PATH по инструкции удаления ниже. Затем установите пакет через winget и откройте новый терминал. Так обновления winget будут запускать управляемый им бинарник; скачанные проекты и конфигурация сохранятся.
+
+## Повседневная работа
+
+Один раз привяжите папку к проекту. `init` берёт репозиторий из `nodi config`; `--repo OWNER/PRIVATE-REPO` позволяет задать другую привязку. Токены остаются в пользовательском хранилище credentials и не записываются в `.nodi/project.json`.
+
+```sh
+cd ~/Desktop/MacStand
+nodi init macstand
+nodi status
+nodi publish
+```
+
+Команды `status` и `publish` находят ближайшую `.nodi/project.json` также из вложенных папок. Повторный `init` сохраняет настройки. В config schema 1 находятся project, repository и, после успешной публикации, last_version; допускаются description и строковые metadata без секретов. Скрытая `.nodi` не входит в пакет. До первой публикации нужен отдельный write credential: `nodi auth login --write`.
+
+`status` ничего не записывает: сканирует поддерживаемые файлы и показывает Added/Modified/Deleted относительно последней полной удалённой версии, включая draft при наличии write credentials. При отсутствии связи или credentials явно выводит NOT VERIFIED; кеш completion за актуальное удалённое состояние не выдаётся. При использовании только read credentials сравнение ограничено released-версиями, и непроверенные drafts отмечаются отдельно.
+
+`publish` определяет проект и файлы, сверяет SHA-256 с GitHub, показывает preview и спрашивает `Publish? [y/N]`. По умолчанию статус draft. Первая версия — 0.1.0, затем PATCH; `--minor` и `--major` увеличивают соответствующую часть и обнуляют младшие. Учитываются версии и черновики с других компьютеров; локальный last_version не управляет версионированием.
+
+```sh
+nodi publish --minor
+nodi publish --major
+nodi publish --status released
+```
+
+Для автоматического `--status released` после ответа `y` требуется набрать `release PROJECT VERSION`, указанные в preview. Это сознательная производственная публикация, а не инженерная проверка. Старый явный синтаксис `nodi publish PROJECT PATH --version X.Y.Z --status released` остаётся без интерактивного диалога: явные версия, источник и статус уже задают намерение автора.
+
+Без изменений выводятся `No changes detected. Nothing to publish.`; release не создаётся даже с --minor/--major. Изменение только времени файла не считается изменением. Если не осталось поддерживаемых файлов, пустой пакет не создаётся. Description/metadata без изменения файлов также не создают новую версию.
+
+Перед загрузкой повторно проверяются удалённое состояние и локальные файлы. Git-тег резервируется атомарно, поэтому одновременная публикация одной версии не перезапишет данные. При конфликте операция прекращается: повторите её, чтобы получить новое состояние и preview. При сетевой ошибке/неполной загрузке новая версия автоматически не выделяется. Сохранённый неполный draft или тег без полного Release требует проверки на GitHub; автоматическая публикация блокируется, пока последняя версия не разрешена вручную. CLI не удаляет её и не выполняет автоматический retry.
+
+## Tab completion и версия
+
+```sh
+nodi -v
+nodi --version
+nodi completion
+```
+
+`version`, `-v` и `--version` показывают реальную версию бинарника и платформу. `completion` выводит инструкции; с именем оболочки — только скрипт. Подсказываются команды, auth login/logout, флаги, draft/released, проекты, версии для --version и пути для publish/--output/--metadata. Проекты и версии берутся через GitHub API с кешем на 60 секунд, привязанным к repository, роли и fingerprint credentials. Для publish используются write credentials и видны drafts; get использует read credentials и только выпущенные версии.
+
+Включить **только в текущем терминале**, без изменения shell profiles:
+
+```zsh
+autoload -Uz compinit; compinit
+source <(nodi completion zsh)
+```
+
+```bash
+source <(nodi completion bash)
+```
+
+```powershell
+nodi completion powershell | Out-String | Invoke-Expression
+```
+
+Homebrew автоматически устанавливает `_nodi` и bash completion в стандартные каталоги. Если оболочка уже использует `brew shellenv` и compinit/bash-completion, Tab доступен после открытия нового терминала. Для zsh `brew shellenv` должен выполняться до compinit; настройка зависит от существующего shell framework. [Инструкция Homebrew](https://docs.brew.sh/Shell-Completion).
+
+Winget ZIP содержит completion scripts, а встроенная команда работает и при установке одного exe. Portable winget не меняет PowerShell profiles: включите completion командой выше. Для постоянного подключения после просмотра скрипта самостоятельно добавьте соответствующую строку в `$PROFILE`, `~/.zshrc` или `~/.bashrc`. Nodi не изменяет эти файлы.
+
+Tab не запрашивает токен и не раскрывает credentials. Общий сетевой таймаут 1,5 секунды. При сетевом сбое используется доступный кеш, без кеша — пустой результат. Подсказки из кеша могут быть устаревшими и не заменяют проверку перед publish/get. При смене repository, роли или токена чужой кеш не используется. Ошибки completion подавляются; терминал продолжает работу.
 
 ## Установка через терминал
 
@@ -72,14 +132,14 @@ nodi version
 
 Установка: `~/.local/bin/nodi`; PATH записывается в `~/.zprofile`. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-Для опубликованного стабильного релиза 0.1.0 доступны сетевые режимы:
+Сетевые режимы версии 0.2.0 (доступны после подтверждённого выпуска; статус — в отчёте NODI-03):
 
 ```powershell
-.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.1.0
+.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.2.0
 ```
 
 ```sh
-sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.1.0
+sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.2.0
 ```
 
 Windows поддерживает приватный релиз CLI через переменную `NODI_INSTALL_TOKEN`; macOS сетевой режим рассчитан на публичный доверенный релиз, для приватной поставки используйте локальный комплект. Токены никогда не передаются аргументом команды. Контрольная сумма из того же доверенного релиза проверяет целостность; отдельной криптографической подписи поставки в v0.1 нет.

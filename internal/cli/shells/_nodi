@@ -1,0 +1,14 @@
+#compdef nodi
+_nodi() {
+    local -a candidates
+    candidates=("${(@f)$("${words[1]}" __complete "${words[@]:1:$CURRENT-1}" 2>/dev/null)}")
+    if [[ "${candidates[1]}" == ':files' ]]; then
+        _files
+    elif (( ${#candidates} )); then
+        compadd -- "${candidates[@]}"
+    fi
+    return 0
+}
+if (( $+functions[compdef] )); then compdef _nodi nodi; fi
+# Homebrew autoloads this file as _nodi; source also works after compinit.
+if [[ "${funcstack[1]}" == '_nodi' ]]; then _nodi "$@"; fi
