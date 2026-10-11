@@ -67,6 +67,9 @@ func TestDynamicCompletionCacheAndOffline(t *testing.T) {
 	if got := complete("publish", "demo", "--version", ""); got != "0.1.0\n" {
 		t.Fatal(got)
 	}
+	if got := complete("publish", "--version", "0.1."); got != "0.1.0\n" {
+		t.Fatal("implicit project version", got)
+	}
 	dir, _ := config.Dir()
 	cacheFiles, _ := filepath.Glob(filepath.Join(dir, "completion", "*.json"))
 	if len(cacheFiles) != 1 {

@@ -213,10 +213,18 @@ func (a *App) complete(ctx context.Context, words []string) {
 		case "--status":
 			emit([]string{equalPrefix + "draft", equalPrefix + "released"}, cur)
 		case "--version":
+			projectName := ""
 			if len(positionals) > 0 {
+				projectName = positionals[0]
+			} else if cmd == "publish" {
+				if b, e := a.binding(); e == nil {
+					projectName = b.Config.Project
+				}
+			}
+			if projectName != "" {
 				var values []string
 				for _, s := range a.remoteSuggestions(ctx, write) {
-					if s.Project == positionals[0] && strings.HasPrefix(s.Version, valuePrefix) {
+					if s.Project == projectName && strings.HasPrefix(s.Version, valuePrefix) {
 						values = append(values, equalPrefix+s.Version)
 					}
 				}
