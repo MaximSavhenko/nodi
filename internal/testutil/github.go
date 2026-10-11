@@ -26,20 +26,22 @@ type Release struct {
 	Assets     []Asset `json:"assets"`
 }
 type GitHub struct {
-	Server         *httptest.Server
-	mu             sync.Mutex
-	releases       []Release
-	data           map[int64][]byte
-	next           int64
-	Private        bool
-	FailUpload     bool
-	FailFinalize   bool
-	CorruptArchive bool
-	ForceStatus    int
-	Requests       []string
-	FailFinalRead  bool
-	MisreportFinalize bool
-	tags           map[string]string
+	Server                                                          *httptest.Server
+	mu                                                              sync.Mutex
+	releases                                                        []Release
+	data                                                            map[int64][]byte
+	next                                                            int64
+	Private                                                         bool
+	FailUpload                                                      bool
+	FailFinalize                                                    bool
+	CorruptArchive                                                  bool
+	ForceStatus                                                     int
+	Requests                                                        []string
+	FailFinalRead                                                   bool
+	MisreportFinalize                                               bool
+	tags                                                            map[string]string
+	FailDeleteRelease, FailDeleteTag, FailHistory, FailDeleteVerify bool
+	FailDeleteReleaseID                                             int64
 }
 
 func NewGitHub() *GitHub {
@@ -51,6 +53,25 @@ func (g *GitHub) Close() { g.Server.Close() }
 
 // Configure serializes failure injection with the HTTP handler for race tests.
 func (g *GitHub) Configure(fn func(*GitHub)) { g.mu.Lock(); defer g.mu.Unlock(); fn(g) }
+
+func (g *GitHub) SetTag(ref, sha string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if sha == "" {
+		delete(g.tags, ref)
+	} else {
+		g.tags[ref] = sha
+	}
+}
+func (g *GitHub) AlterRelease(id int64, change func(*Release)) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for i := range g.releases {
+		if g.releases[i].ID == id {
+			change(&g.releases[i])
+		}
+	}
+}
 func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -92,6 +113,20 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 		respond(refs)
 		return
 	}
+	if strings.HasPrefix(p, "/git/refs/tags/") && r.Method == "DELETE" {
+		if g.FailDeleteTag {
+			w.WriteHeader(503)
+			return
+		}
+		ref := "refs/tags/" + strings.TrimPrefix(p, "/git/refs/tags/")
+		if _, ok := g.tags[ref]; !ok {
+			w.WriteHeader(404)
+			return
+		}
+		delete(g.tags, ref)
+		w.WriteHeader(204)
+		return
+	}
 	if p == "/git/refs" && r.Method == "POST" {
 		var input struct {
 			Ref string `json:"ref"`
@@ -103,6 +138,10 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if !strings.HasPrefix(input.Ref, "refs/") || strings.Count(input.Ref, "/") < 2 {
 			w.WriteHeader(422)
+			return
+		}
+		if g.FailHistory && strings.HasPrefix(input.Ref, "refs/tags/nodi-deleted/") {
+			w.WriteHeader(503)
 			return
 		}
 		if _, ok := g.tags[input.Ref]; ok {
@@ -167,7 +206,10 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 		tag := strings.TrimPrefix(p, "/releases/tags/")
 		for _, release := range g.releases {
 			if release.Tag == tag && (!release.Draft || r.Header.Get("Authorization") == "Bearer write-test") {
-				if g.FailFinalRead && !release.Draft { w.WriteHeader(503); return }
+				if g.FailFinalRead && !release.Draft {
+					w.WriteHeader(503)
+					return
+				}
 				respond(release)
 				return
 			}
@@ -200,7 +242,20 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if index < 0 {
+			if g.FailDeleteVerify {
+				w.WriteHeader(503)
+				return
+			}
 			w.WriteHeader(404)
+			return
+		}
+		if len(parts) == 1 && r.Method == "DELETE" {
+			if g.FailDeleteRelease || g.FailDeleteReleaseID == id {
+				w.WriteHeader(503)
+				return
+			}
+			g.releases = append(g.releases[:index], g.releases[index+1:]...)
+			w.WriteHeader(204)
 			return
 		}
 		if len(parts) == 2 && parts[1] == "assets" && r.Method == "POST" {

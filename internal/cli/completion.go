@@ -147,11 +147,12 @@ func (a *App) remoteSuggestions(ctx context.Context, write, useBinding bool) []s
 }
 
 var commandFlags = map[string][]string{
+	"send": {"--name", "--dry-run"}, "delete": {"--version", "--all", "--dry-run"}, "update": {"--check"},
 	"setup": {"--check", "--repo", "--write", "--completion"},
 	"get":   {"--version", "--output"}, "publish": {"--version", "--status", "--draft", "--description", "--metadata", "--minor", "--major"},
 	"list": {"--all"}, "info": {"--all"}, "config": {"--repo"}, "init": {"--repo"}, "auth": {"--write"},
 }
-var valueFlags = map[string]bool{"--version": true, "--output": true, "--status": true, "--description": true, "--metadata": true, "--repo": true}
+var valueFlags = map[string]bool{"--version": true, "--output": true, "--status": true, "--description": true, "--metadata": true, "--repo": true, "--name": true}
 
 func (a *App) complete(ctx context.Context, words []string) {
 	// This internal protocol always exits successfully and only emits validated candidates.
@@ -175,12 +176,12 @@ func (a *App) complete(ctx context.Context, words []string) {
 		}
 	}
 	if len(before) == 0 {
-		emit([]string{"version", "help", "completion", "setup", "init", "status", "publish", "send", "get", "list", "info", "open", "config", "auth", "-v", "--version", "--help"}, cur)
+		emit([]string{"version", "help", "completion", "setup", "init", "status", "publish", "send", "delete", "update", "get", "list", "info", "open", "config", "auth", "-v", "--version", "--help"}, cur)
 		return
 	}
 	positionals := []string{}
 	pending := ""
-	write := cmd == "publish"
+	write := cmd == "publish" || cmd == "delete"
 	literal := false
 	for _, w := range before[1:] {
 		if pending != "" {
@@ -257,7 +258,7 @@ func (a *App) complete(ctx context.Context, words []string) {
 		if len(positionals) == 0 {
 			emit([]string{"bash", "zsh", "powershell"}, cur)
 		}
-	case "get", "info", "open", "publish":
+	case "get", "info", "open", "publish", "delete":
 		if len(positionals) == 0 {
 			var values []string
 			for _, s := range a.remoteSuggestions(ctx, write, cmd == "publish") {

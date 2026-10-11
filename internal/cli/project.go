@@ -155,6 +155,9 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	if e != nil {
 		return fmt.Errorf("remote state could not be verified; nothing published: %w", e)
 	}
+	if b == nil && !o.ownsName && state.Version != "" {
+		return nameConflict(name, source)
+	}
 	bump := "patch"
 	if o.minor {
 		bump = "minor"
@@ -200,7 +203,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 		return nil
 	}
 	if len(files) == 0 {
-		return fmt.Errorf("no transferable files remain; empty packages cannot be published")
+		return fmt.Errorf("no transferable files remain; add ordinary files to the delivery folder and preview exclusions with nodi send %q --dry-run", source)
 	}
 	m, zip, e := archive.Prepare(ctx, source, name, next, o.status, desc, metadata)
 	if e != nil {
