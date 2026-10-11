@@ -250,6 +250,13 @@ func (a *App) autoPublish(ctx context.Context, o options) error {
 	if !project.Diff(after, m.Files).Empty() {
 		return fmt.Errorf("files changed after preview; retry the operation")
 	}
+	bound, e := project.Read(b.Root)
+	if e != nil {
+		return e
+	}
+	if bound.Config.Project != b.Config.Project || bound.Config.Repository != b.Config.Repository {
+		return fmt.Errorf("project binding changed after preview; retry the operation")
+	}
 	if e = s.Publish(ctx, m, zip); e != nil {
 		return e
 	}

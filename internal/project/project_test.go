@@ -40,6 +40,13 @@ func TestInitFindPreserve(t *testing.T) {
 	if e != nil || len(files) != 1 || files[0].Path != "part.dxf" {
 		t.Fatal(files, e)
 	}
+	st, _ := os.Stat(filepath.Join(root, "part.dxf"))
+	os.WriteFile(filepath.Join(root, "part.dxf"), []byte("different"), 0644)
+	os.Chtimes(filepath.Join(root, "part.dxf"), st.ModTime(), st.ModTime())
+	changed, e := Scan(context.Background(), b)
+	if e != nil || Diff(changed, files).Modified != 1 {
+		t.Fatal("same size/time content change missed", changed, e)
+	}
 	if e = b.SaveVersion("0.1.0"); e != nil {
 		t.Fatal(e)
 	}

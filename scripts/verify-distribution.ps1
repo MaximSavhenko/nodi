@@ -44,7 +44,8 @@ if (-not $SkipRuntime) {
     $binary = Join-Path $DistributionDirectory $binaryName
     $savedPath = $env:PATH
     try {
-        if ($Platform -eq 'windows-amd64') { $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot" } else { & /bin/chmod +x $binary; $env:PATH = '/usr/bin:/bin:/usr/sbin:/sbin' }
+        if ($Platform -ne 'windows-amd64') { & /bin/chmod +x $binary }
+        $env:PATH = ''
         $actualVersion = (& $binary version).Trim()
         if ($LASTEXITCODE -ne 0 -or $actualVersion -cne "nodi $Version $($Platform.Replace('-','/'))") { throw "Unexpected runtime version: $actualVersion" }
         foreach ($alias in @('-v','--version')) {

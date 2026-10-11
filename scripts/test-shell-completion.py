@@ -87,7 +87,8 @@ def main(binary):
                 drain(master, 0.1)
             print("PASS: real bash completion and interactive zsh Tab, commands/projects/versions/paths with spaces.")
         finally:
-            process.terminate()
+            # An interactive zsh ignores SIGTERM; this is our isolated test child.
+            process.kill()
             process.wait(timeout=5)
             os.close(master)
 
