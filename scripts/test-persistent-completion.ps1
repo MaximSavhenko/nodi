@@ -57,8 +57,12 @@ foreach ($case in @(@('nodi pub',@('publish')),@('nodi se',@('setup')),@('nodi g
             Get-Command nodi,ConvertTo-Json,Register-ArgumentCompleter | Select-Object Name,Source | Format-Table | Out-String | Write-Output
             $Error | Select-Object -First 5 | ForEach-Object { Write-Output $_.ToString() }
             nodi __complete pub
+            $oldEncoding = $OutputEncoding
+            try { $OutputEncoding=[Text.UTF8Encoding]::new($false); '["pub"]' | nodi __complete --json } finally { $OutputEncoding=$oldEncoding }
             # A secondary manual probe is diagnostic only; the original startup failure still fails CI.
             $probe = (nodi completion powershell | Out-String).Replace('    try {', '    [Console]::Error.WriteLine("Completer called: " + $wordToComplete); try {').Replace('} catch { }', '} catch { [Console]::Error.WriteLine($_.Exception.ToString()) }')
+            $probe = $probe.Replace('$savedEncoding=$OutputEncoding', '[Console]::Error.WriteLine("JSON request: " + $request + "; program: " + $program); $savedEncoding=$OutputEncoding')
+            $probe = $probe.Replace('foreach ($candidate in $candidates)', '[Console]::Error.WriteLine("Candidates: " + ($candidates -join ",") + "; exit: " + $LASTEXITCODE); foreach ($candidate in $candidates)')
             Invoke-Expression $probe
             $manual = TabExpansion2 -inputScript $case[0] -cursorColumn $case[0].Length
             Write-Output "Diagnostic manual probe: $($manual.CompletionMatches.CompletionText)"
