@@ -1,0 +1,6 @@
+/.tools/
+/dist/
+*.test
+coverage.out
+.env
+.env.*
