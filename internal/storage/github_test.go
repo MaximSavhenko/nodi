@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -113,6 +114,44 @@ func TestPrivateAndNetwork(t *testing.T) {
 	}
 	if _, e = NewGitHubWithClient("owner/private", "read-test", "http://localhost", "https://localhost", &http.Client{}); e == nil {
 		t.Fatal("HTTP accepted")
+	}
+}
+
+func TestEmptyMetadataPublicationAndLegacyMismatch(t *testing.T) {
+	mock := testutil.NewGitHub()
+	defer mock.Close()
+	g, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())
+	source := t.TempDir()
+	os.WriteFile(filepath.Join(source, "file.txt"), []byte("fixture"), 0644)
+	m, z, e := archive.Prepare(context.Background(), source, "demo", "0.1.0", "draft", "", map[string]string{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer os.Remove(z)
+	if e = g.Publish(context.Background(), m, z); e != nil {
+		t.Fatal(e)
+	}
+	r, e := g.byTag(context.Background(), "demo/v0.1.0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Reproduce a manually published old draft. Neither assets nor checks change.
+	if e = g.json(context.Background(), "PATCH", g.endpoint(fmt.Sprintf("/releases/%d", r.ID)), map[string]bool{"draft": false, "prerelease": false}, nil); e != nil {
+		t.Fatal(e)
+	}
+	_, e = g.Get(context.Background(), "demo", "0.1.0")
+	if e == nil || !strings.Contains(e.Error(), "manifest status=draft") || !strings.Contains(e.Error(), "verified new version") {
+		t.Fatal("legacy mismatch accepted or undiagnosed", e)
+	}
+	m.Project, m.Status = "other", "released"
+	if e = g.Publish(context.Background(), m, z); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = g.Get(context.Background(), "other", ""); e != nil {
+		t.Fatal("broken unrelated project blocked latest get", e)
+	}
+	if ms, e := g.ProjectList(context.Background(), "other", true); e != nil || len(ms) != 1 {
+		t.Fatal("broken unrelated project blocked info", ms, e)
 	}
 }
 func TestPagination(t *testing.T) {

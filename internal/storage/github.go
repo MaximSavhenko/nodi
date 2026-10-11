@@ -272,6 +272,19 @@ func (g *GitHub) verifyAssets(ctx context.Context, r release, expected model.Man
 	return nil
 }
 func (g *GitHub) List(ctx context.Context, all bool) ([]model.Manifest, error) {
+	return g.list(ctx, "", all)
+}
+
+// Project reads validate all selected releases, without letting a broken
+// unrelated package block info or latest get for this project.
+func (g *GitHub) ProjectList(ctx context.Context, project string, all bool) ([]model.Manifest, error) {
+	if e := model.ValidateProject(project); e != nil {
+		return nil, e
+	}
+	return g.list(ctx, project, all)
+}
+
+func (g *GitHub) list(ctx context.Context, project string, all bool) ([]model.Manifest, error) {
 	if e := g.VerifyPrivate(ctx); e != nil {
 		return nil, e
 	}
@@ -281,7 +294,7 @@ func (g *GitHub) List(ctx context.Context, all bool) ([]model.Manifest, error) {
 	}
 	result := []model.Manifest{}
 	for _, r := range rs {
-		if _, _, ok := model.ParseTag(r.Tag); !ok {
+		if p, _, ok := model.ParseTag(r.Tag); !ok || project != "" && p != project {
 			continue
 		}
 		if !all && (r.Draft || r.Prerelease) {
@@ -331,7 +344,7 @@ func (g *GitHub) Get(ctx context.Context, project, version string) (model.Manife
 		}
 		return g.manifest(ctx, r)
 	}
-	ms, e := g.List(ctx, false)
+	ms, e := g.ProjectList(ctx, project, false)
 	if e != nil {
 		return model.Manifest{}, e
 	}

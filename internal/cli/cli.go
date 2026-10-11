@@ -360,7 +360,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 		}
 		return w.Flush()
 	case "info":
-		ms, e := store.List(ctx, o.all)
+		ms, e := store.ProjectList(ctx, o.args[0], o.all)
 		if e != nil {
 			return e
 		}
