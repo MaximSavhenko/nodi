@@ -131,3 +131,36 @@ jobs:
           fi
           gh release create "$RELEASE_TAG" --verify-tag --draft --title "Nodi $RELEASE_TAG" --notes 'Confirmed native runtime and Go tests: Windows amd64, macOS ARM64/Intel. See validation.json for source commit, artifact SHA-256 and CI evidence. MIT licensed. Engineering package readiness is decided by its author.' dist/nodi-windows-amd64.exe dist/nodi-windows-amd64.zip dist/nodi-darwin-arm64 dist/nodi-darwin-arm64.zip dist/nodi-darwin-amd64 dist/nodi-darwin-amd64.zip dist/SHA256SUMS dist/nodi.rb dist/winget-manifests.zip dist/validation.json LICENSE
           gh release edit "$RELEASE_TAG" --draft=false --latest
+  winget-install:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, native, publish]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate and install the exact published portable package
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          $url="https://github.com/$env:OWNER/nodi/releases/download/v$env:VERSION/winget-manifests.zip"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP/manifests.zip"
+          Expand-Archive -LiteralPath "$env:RUNNER_TEMP/manifests.zip" -DestinationPath "$env:RUNNER_TEMP/manifests"
+          winget validate --manifest "$env:RUNNER_TEMP/manifests"
+          if ($LASTEXITCODE -ne 0) { throw 'Published manifest validation failed.' }
+          # This development setting is confined to the disposable CI runner.
+          winget settings --enable LocalManifestFiles
+          if ($LASTEXITCODE -ne 0) { throw 'Runner cannot enable local manifest testing.' }
+          winget install --manifest "$env:RUNNER_TEMP/manifests" --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
+          if ($LASTEXITCODE -ne 0) { throw 'Portable winget installation failed.' }
+          $env:PATH=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')
+          $versionOutput=(nodi version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $versionOutput -cne "nodi $env:VERSION windows/amd64") { throw 'Installed command alias/version check failed.' }
+          nodi help
+          if ($LASTEXITCODE -ne 0) { throw 'Installed help command failed.' }
+          winget list --id "$env:OWNER.Nodi" --exact --accept-source-agreements --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'winget version detection failed.' }
+          winget uninstall --id "$env:OWNER.Nodi" --exact --silent --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'winget uninstall failed.' }
+          if (Test-Path "$env:LOCALAPPDATA/Microsoft/WinGet/Links/nodi.exe") { throw 'Portable command alias remains after uninstall.' }
