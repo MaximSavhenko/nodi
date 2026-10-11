@@ -42,6 +42,7 @@ type GitHub struct {
 	tags                                                            map[string]string
 	FailDeleteRelease, FailDeleteTag, FailHistory, FailDeleteVerify bool
 	FailDeleteReleaseID                                             int64
+	DraftTagUnavailable, ReplaceDeletedWithDraft                    bool
 }
 
 func NewGitHub() *GitHub {
@@ -205,6 +206,9 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(p, "/releases/tags/") {
 		tag := strings.TrimPrefix(p, "/releases/tags/")
 		for _, release := range g.releases {
+			if release.Draft && g.DraftTagUnavailable {
+				continue
+			}
 			if release.Tag == tag && (!release.Draft || r.Header.Get("Authorization") == "Bearer write-test") {
 				if g.FailFinalRead && !release.Draft {
 					w.WriteHeader(503)
@@ -254,7 +258,15 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(503)
 				return
 			}
+			old := g.releases[index]
 			g.releases = append(g.releases[:index], g.releases[index+1:]...)
+			if g.ReplaceDeletedWithDraft {
+				old.ID = g.next
+				g.next++
+				old.Draft = true
+				old.Prerelease = false
+				g.releases = append(g.releases, old)
+			}
 			w.WriteHeader(204)
 			return
 		}
