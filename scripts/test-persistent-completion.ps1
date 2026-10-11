@@ -51,7 +51,15 @@ $ErrorActionPreference = 'Stop'
 if ($env:NODI_STARTUP_EXPECT_SETTING -and $global:NodiUserSetting -cne 'preserved') { throw 'Existing profile setting was lost' }
 foreach ($case in @(@('nodi pub',@('publish')),@('nodi se',@('setup')),@('nodi get nod',@('nodi-ux-1')),@('nodi get nodi-ux-1 --version 0.1.',@('0.1.0','0.1.1')))) {
     $actual = @((TabExpansion2 -inputScript $case[0] -cursorColumn $case[0].Length).CompletionMatches | ForEach-Object CompletionText)
-    foreach ($expected in $case[1]) { if ($actual -notcontains $expected) { throw "Missing $expected in fresh startup: $actual" } }
+    foreach ($expected in $case[1]) {
+        if ($actual -notcontains $expected) {
+            Write-Output "Fresh startup: $($PSVersionTable.PSVersion); PATH=$env:PATH"
+            Get-Command nodi,ConvertTo-Json,Register-ArgumentCompleter | Select-Object Name,Source | Format-Table | Out-String | Write-Output
+            $Error | Select-Object -First 5 | ForEach-Object { Write-Output $_.ToString() }
+            nodi __complete pub
+            throw "Missing $expected in fresh startup: $actual"
+        }
+    }
 }
 Write-Output "PASS: fresh $($PSVersionTable.PSVersion) process, automatic profile loading, commands/projects/versions. Profile: $($PROFILE.CurrentUserAllHosts)"
 '@
