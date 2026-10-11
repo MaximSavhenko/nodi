@@ -4,6 +4,37 @@ Nodi передаёт инженерные пакеты между Windows и ma
 
 Команды запускаются вручную. Nodi не проверяет технологическую пригодность чертежей: `released` означает явный статус публикации, заданный автором пакета.
 
+## GitHub и пакетные менеджеры
+
+- [nodi](https://github.com/MaximSavhenko/nodi) — публичный исходный код (MIT), проверки и бинарные релизы.
+- [homebrew-nodi](https://github.com/MaximSavhenko/homebrew-nodi) — публичный Homebrew tap.
+- [nodi-packages](https://github.com/MaximSavhenko/nodi-packages) — приватное хранилище пакетов; требуется доступ пользователя.
+
+macOS, Apple Silicon и Intel:
+
+```sh
+brew install MaximSavhenko/nodi/nodi
+nodi version
+nodi help
+brew update
+brew upgrade MaximSavhenko/nodi/nodi
+brew uninstall MaximSavhenko/nodi/nodi
+```
+
+Formula устанавливает готовый бинарник из ZIP с проверкой SHA-256; Go для установки не нужен. Tap автоматически обновляется каждый час только из стабильного релиза с подтверждающим `validation.json`. Homebrew должен быть установлен отдельно.
+
+Windows, **после принятия пакета в официальный источник winget**:
+
+```powershell
+winget install --id MaximSavhenko.Nodi --exact --source winget
+nodi version
+nodi help
+winget upgrade --id MaximSavhenko.Nodi --exact --source winget
+winget uninstall --id MaximSavhenko.Nodi --exact
+```
+
+WinGet управляет portable ZIP, командой `nodi` в PATH, установленной версией и удалением. Если команда пока не находится в официальном источнике, используйте терминальный установщик ниже. Локальная проверка manifest и установка из manifest не означают доступность пакета в каталоге Microsoft. Актуальные ссылки на релиз, PR и результаты проверок: [docs/NODI-02-STATUS.md](docs/NODI-02-STATUS.md).
+
 ## Установка через терминал
 
 В этой локальной поставке самостоятельные программы находятся в `dist/`:
@@ -40,23 +71,23 @@ nodi version
 После **явной публикации разработчиком** CLI-сборок и `SHA256SUMS` в доверенном GitHub-релизе доступны сетевые режимы. Замените `OWNER/NODI-CODE` на выбранный репозиторий исходного кода CLI:
 
 ```powershell
-.\scripts\install-windows.ps1 -Repository OWNER/NODI-CODE -Release v0.1.0
+.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.1.0
 ```
 
 ```sh
-sh scripts/install-macos.sh --repo OWNER/NODI-CODE --release v0.1.0
+sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.1.0
 ```
 
 Windows поддерживает приватный релиз CLI через переменную `NODI_INSTALL_TOKEN`; macOS сетевой режим рассчитан на публичный доверенный релиз, для приватной поставки используйте локальный комплект. Токены никогда не передаются аргументом команды. Контрольная сумма из того же доверенного релиза проверяет целостность; отдельной криптографической подписи поставки в v0.1 нет.
 
 ## Первая настройка GitHub
 
-1. Создайте отдельный **private** репозиторий для инженерных пакетов, например `OWNER/nodi-packages`, с начальным коммитом/README. Исходный код Nodi храните отдельно. Nodi не создаёт облачные репозитории автоматически и отказывается работать с публичным хранилищем.
+1. Используйте подготовленный **private** репозиторий `MaximSavhenko/nodi-packages` с начальным коммитом/README, либо свой отдельный приватный репозиторий. Исходный код Nodi храните отдельно. Nodi не создаёт облачные репозитории автоматически и отказывается работать с публичным хранилищем.
 2. Создайте fine-grained Personal Access Token только для выбранного репозитория. Для получения: **Contents: Read-only**. Для публикации на домашнем компьютере: отдельный токен **Contents: Read and write**. Стандартное право Metadata оставьте включённым. При необходимости подтвердите доступ организации/SSO. Не выдавайте права на остальные репозитории.
 3. Выполните настройку на каждом компьютере:
 
 ```text
-nodi config --repo OWNER/nodi-packages
+nodi config --repo MaximSavhenko/nodi-packages
 nodi auth login
 ```
 
@@ -123,7 +154,7 @@ nodi publish macstand ./manufacturing --version 1.0.1 --status released --metada
 - SHA-256 ZIP и каждого файла, размеры и состав проверяются до установки результата. Распаковка идёт в временную папку; неверные файлы не становятся результатом.
 - Запрещены абсолютные пути, `..`, обратные слеши, потоки NTFS, системные имена, ссылки, дубли и различия путей только регистром. Существующая целевая папка не заменяется. Локальный злоумышленник с доступом к переименованию родительских папок во время операции не входит в модель защиты MVP.
 - Транспорт не предоставляет цифровую подпись пакета. SHA-256 защищает целостность относительно манифеста; редактор репозитория может изменить и архив, и манифест. GitHub на стороне сервиса не превращается Nodi в неизменяемое хранилище.
-- Нет фоновой синхронизации, автоматического обновления, resume-download, retry публикаций, работы с оборудованием или CAD. Сборки macOS не подписаны/notarized. Homebrew/winget пока не опубликованы; самостоятельные бинарники и `SHA256SUMS` пригодны для будущих рецептов.
+- Нет фоновой синхронизации, самостоятельного автообновления CLI, resume-download, retry публикаций, работы с оборудованием или CAD. Сборки macOS не подписаны/notarized. Обновления программой управляются Homebrew/winget; статус включения в официальный winget указан отдельно.
 
 ## Обновление и удаление
 
@@ -148,7 +179,7 @@ go vet ./...
 .\scripts\build.ps1 -Go "$PWD\.tools\go\bin\go.exe"
 ```
 
-Флаги сборки: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, пустой build ID, фиксированная версия CLI. Порядок файлов ZIP и время в ZIP фиксированы; манифест содержит реальное время подготовки. GitHub Actions проверяет Windows/macOS и собирает три бинарника; workflow не публикует релизы автоматически. Для локального `-race` нужен совместимый C-компилятор; CI запускает race-проверки.
+Флаги сборки: `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, пустой build ID, версия CLI из стабильного тега. Порядок файлов ZIP и время в ZIP фиксированы; манифест инженерного пакета содержит реальное время подготовки. GitHub Actions собирает три бинарника, запускает Go-проверки и точные release-бинарники на Windows, macOS ARM64 и Intel, затем публикует релиз только по тегу `vMAJOR.MINOR.PATCH`. Вложения сначала загружаются в draft; стабильный релиз открывается после подтверждённых native-проверок и `winget validate`. Существующие релизы не заменяются. Для локального `-race` нужен совместимый C-компилятор; CI запускает race-проверки на macOS.
 
 ```powershell
 go test -v ./internal/cli -run TestMockEndToEnd
@@ -156,4 +187,4 @@ go test -v ./internal/cli -run TestMockEndToEnd
 
 Это явно **mock end-to-end**: реальные CLI-команды, упаковка, GitHub-совместимый HTTPS API, статусы, скачивание, SHA-256, сохранение локального пути, вызов подменённого opener и отказ от перезаписи. Используются фиктивные `examples/manufacturing/*.dxf` и `*.pdf`, помеченные `NOT FOR MANUFACTURING`. Они не прошли инженерную проверку.
 
-Фактические результаты этой поставки и непроверенные сценарии — в [docs/VALIDATION.md](docs/VALIDATION.md). Реальные GitHub credentials не включены. Перед первым использованием выполните сценарий с фиктивным проектом в своём приватном репозитории; на предприятии нужно разрешение ответственных за оборудование и информационную безопасность.
+Первоначальная mock-проверка — в [docs/VALIDATION.md](docs/VALIDATION.md); реальные результаты GitHub, Homebrew и winget — в [docs/NODI-02-STATUS.md](docs/NODI-02-STATUS.md). Реальные GitHub credentials не включены в исходники или релизы. Для проверки передачи доступны фиктивные пакеты `nodi-demo` и manually dispatched workflow в приватном хранилище: автор получает `Contents: write`, получатели — отдельные токены `Contents: read`. На предприятии нужно разрешение ответственных за оборудование и информационную безопасность.
