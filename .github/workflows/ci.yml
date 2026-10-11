@@ -1,45 +1,133 @@
-name: Nodi checks and builds
+name: Nodi validation and release
 on:
   push:
+    branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: nodi-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  test:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Resolve stable version and tag ancestry
+        id: version
+        shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          $version = '0.1.0'
+          if ($env:REF_TYPE -eq 'tag') {
+            if ($env:REF_NAME -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Only stable version tags can be released.' }
+            $version = $env:REF_NAME.Substring(1)
+            git merge-base --is-ancestor HEAD origin/main
+            if ($LASTEXITCODE -ne 0) { throw 'Release commit must belong to reviewed main history.' }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - run: go vet ./...
+      - run: go test -cover ./...
+      - name: Build and generate distribution
+        shell: pwsh
+        run: |
+          ./scripts/build.ps1 -Version '${{ steps.version.outputs.version }}'
+          ./scripts/generate-distribution.ps1 -Version '${{ steps.version.outputs.version }}' -Owner '${{ github.repository_owner }}' -License MIT
+          ./scripts/verify-distribution.ps1 -Version '${{ steps.version.outputs.version }}' -Platform windows-amd64
+      - name: Validate winget manifests
+        shell: pwsh
+        run: |
+          winget validate --manifest 'packaging/winget/manifests/m/${{ github.repository_owner }}/Nodi/${{ steps.version.outputs.version }}'
+          if ($LASTEXITCODE -ne 0) { throw 'winget validation failed.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nodi-distribution
+          path: dist/*
+          if-no-files-found: error
+  native:
+    needs: build
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        include:
+          - os: windows-latest
+            platform: windows-amd64
+          - os: macos-15
+            platform: darwin-arm64
+          - os: macos-15-intel
+            platform: darwin-amd64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.2'
           cache: false
       - run: go vet ./...
-      - run: go test -race -cover ./...
-  build:
-    needs: test
+      - run: go test -cover ./...
+      - name: Race checks on macOS
+        if: runner.os == 'macOS'
+        run: go test -race ./...
+      - uses: actions/download-artifact@v4
+        with:
+          name: nodi-distribution
+          path: dist
+      - name: Execute the exact release binary without developer tools in PATH
+        shell: pwsh
+        run: ./scripts/verify-distribution.ps1 -Version '${{ needs.build.outputs.version }}' -Platform '${{ matrix.platform }}'
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, native]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
         with:
-          go-version: '1.27.2'
-          cache: false
-      - name: Build standalone binaries
-        shell: bash
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: nodi-distribution
+          path: dist
+      - name: Verify artifacts and generate confirmation receipt
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          mkdir -p dist
-          export CGO_ENABLED=0
-          GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid= -X main.version=0.1.0' -o dist/nodi-windows-amd64.exe ./cmd/nodi
-          GOOS=darwin GOARCH=arm64 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid= -X main.version=0.1.0' -o dist/nodi-darwin-arm64 ./cmd/nodi
-          GOOS=darwin GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags='-s -w -buildid= -X main.version=0.1.0' -o dist/nodi-darwin-amd64 ./cmd/nodi
-          cd dist
-          sha256sum nodi-* > SHA256SUMS
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nodi-0.1.0
-          path: dist/*
-          if-no-files-found: error
+          ./scripts/verify-distribution.ps1 -Version $env:RELEASE_VERSION -SkipRuntime
+          $receipt = Get-Content ./dist/build-metadata.json -Raw | ConvertFrom-Json
+          if ($receipt.source_commit -cne $env:SOURCE_COMMIT) { throw 'Source commit mismatch.' }
+          $receipt.confirmed = $true
+          $receipt | Add-Member -NotePropertyName checks -NotePropertyValue @('windows-amd64','darwin-arm64','darwin-amd64','winget-validate')
+          $receipt | Add-Member -NotePropertyName workflow_url -NotePropertyValue $env:RUN_URL
+          $receipt | ConvertTo-Json -Depth 10 | Set-Content ./dist/validation.json -Encoding utf8NoBOM
+      - name: Publish only validated binaries, starting with a draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'A release for this tag already exists; replacement is forbidden.' >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Nodi $RELEASE_TAG" --notes 'Confirmed native runtime and Go tests: Windows amd64, macOS ARM64/Intel. See validation.json for source commit, artifact SHA-256 and CI evidence. MIT licensed. Engineering package readiness is decided by its author.' dist/nodi-windows-amd64.exe dist/nodi-windows-amd64.zip dist/nodi-darwin-arm64 dist/nodi-darwin-arm64.zip dist/nodi-darwin-amd64 dist/nodi-darwin-amd64.zip dist/SHA256SUMS dist/nodi.rb dist/winget-manifests.zip dist/validation.json LICENSE
+          gh release edit "$RELEASE_TAG" --draft=false --latest

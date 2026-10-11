@@ -197,7 +197,10 @@ func CheckParents(p string) error {
 	for {
 		st, e := os.Lstat(p)
 		if e == nil {
-			if st.Mode()&os.ModeSymlink != 0 || !st.IsDir() {
+			if st.Mode()&os.ModeSymlink != 0 && nativeSystemAlias(p) {
+				// macOS owns /var, /tmp and /etc aliases; user-created links
+				// and every archive link remain forbidden.
+			} else if st.Mode()&os.ModeSymlink != 0 || !st.IsDir() {
 				return fmt.Errorf("unsafe parent directory: %s", p)
 			}
 		} else if !os.IsNotExist(e) {

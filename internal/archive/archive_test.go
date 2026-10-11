@@ -188,3 +188,18 @@ func TestCancelledPackaging(t *testing.T) {
 		t.Fatal("ignored cancellation")
 	}
 }
+
+func TestTemporaryParentsAndUserLinks(t *testing.T) {
+	if e := CheckParents(t.TempDir()); e != nil {
+		t.Fatalf("native temporary directory must work: %v", e)
+	}
+	parent := t.TempDir()
+	real := t.TempDir()
+	link := filepath.Join(parent, "user-link")
+	if e := os.Symlink(real, link); e != nil {
+		t.Skip("host does not permit directory symlinks")
+	}
+	if e := CheckParents(filepath.Join(link, "output")); e == nil {
+		t.Fatal("accepted a user-created parent symlink")
+	}
+}
