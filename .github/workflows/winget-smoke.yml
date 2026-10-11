@@ -1,0 +1,23 @@
+name: Published winget package smoke
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published stable version
+        required: true
+        default: '0.1.0'
+permissions:
+  contents: read
+jobs:
+  install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install and remove the published package
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          OWNER: ${{ github.repository_owner }}
+        run: ./scripts/test-winget-install.ps1 -Version $env:VERSION -Owner $env:OWNER

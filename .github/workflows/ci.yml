@@ -138,29 +138,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate and install the exact published portable package
         shell: pwsh
         env:
           VERSION: ${{ needs.build.outputs.version }}
           OWNER: ${{ github.repository_owner }}
-        run: |
-          $url="https://github.com/$env:OWNER/nodi/releases/download/v$env:VERSION/winget-manifests.zip"
-          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP/manifests.zip"
-          Expand-Archive -LiteralPath "$env:RUNNER_TEMP/manifests.zip" -DestinationPath "$env:RUNNER_TEMP/manifests"
-          winget validate --manifest "$env:RUNNER_TEMP/manifests"
-          if ($LASTEXITCODE -ne 0) { throw 'Published manifest validation failed.' }
-          # This development setting is confined to the disposable CI runner.
-          winget settings --enable LocalManifestFiles
-          if ($LASTEXITCODE -ne 0) { throw 'Runner cannot enable local manifest testing.' }
-          winget install --manifest "$env:RUNNER_TEMP/manifests" --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
-          if ($LASTEXITCODE -ne 0) { throw 'Portable winget installation failed.' }
-          $env:PATH=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User')
-          $versionOutput=(nodi version).Trim()
-          if ($LASTEXITCODE -ne 0 -or $versionOutput -cne "nodi $env:VERSION windows/amd64") { throw 'Installed command alias/version check failed.' }
-          nodi help
-          if ($LASTEXITCODE -ne 0) { throw 'Installed help command failed.' }
-          winget list --id "$env:OWNER.Nodi" --exact --accept-source-agreements --disable-interactivity
-          if ($LASTEXITCODE -ne 0) { throw 'winget version detection failed.' }
-          winget uninstall --id "$env:OWNER.Nodi" --exact --silent --disable-interactivity
-          if ($LASTEXITCODE -ne 0) { throw 'winget uninstall failed.' }
-          if (Test-Path "$env:LOCALAPPDATA/Microsoft/WinGet/Links/nodi.exe") { throw 'Portable command alias remains after uninstall.' }
+        run: ./scripts/test-winget-install.ps1 -Version $env:VERSION -Owner $env:OWNER
