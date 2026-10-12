@@ -21,6 +21,7 @@ type Asset struct {
 type Release struct {
 	ID         int64   `json:"id"`
 	Tag        string  `json:"tag_name"`
+	Body       string  `json:"body"`
 	Draft      bool    `json:"draft"`
 	Prerelease bool    `json:"prerelease"`
 	Assets     []Asset `json:"assets"`
@@ -96,7 +97,7 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	respond := func(v any) { w.Header().Set("Content-Type", "application/json"); json.NewEncoder(w).Encode(v) }
 	if p == "" {
-		respond(map[string]any{"private": g.Private, "default_branch": "main"})
+		respond(map[string]any{"id": 101, "private": g.Private, "default_branch": "main"})
 		return
 	}
 	if p == "/git/ref/heads/main" {
