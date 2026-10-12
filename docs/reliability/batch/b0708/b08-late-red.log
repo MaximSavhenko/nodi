@@ -1,0 +1,6 @@
+=== RUN   TestRegressionB08LateReleaseConflict
+    state_regression_test.go:68: late foreign release must be a safe version conflict version already exists (including draft); choose a new version
+--- FAIL: TestRegressionB08LateReleaseConflict (0.18s)
+FAIL
+FAIL	nodi/internal/storage	0.209s
+FAIL
