@@ -45,6 +45,8 @@ Historical CI failures are preserved in Actions: B04 run 38251511855 timed out a
 
 ## Nodi Server 0.6.0
 
+The final concurrent-publication fixture rendezvous is now placed before reservation POSTs. The old barrier counted preflight GETs, which one writer could perform twice by itself; it did not guarantee actual contention. The new barrier requires both independent writers at the atomic reservation point, strengthening the one-winner/one-conflict oracle without relaxing assertions. A separate late-draft injection proves read-only conflict handling between preflight snapshots. All occupied-version paths retain the same explicit conflict classification.
+
 Final native review also exercised scheduling where a competing writer completed a reservation between preflight reads. A known occupied version now reports `version conflict` even when its release is still incomplete, while unknown/network state remains a conservative verification error. Additional conflict-classification RED/GREEN logs are in `batch/b0708`; all ownership/hash/no-write guards remain in place. A Windows fresh-profile check on the B05 HEAD failed once and passed on a same-HEAD job rerun; no assertion was removed or skipped.
 
 After a stable 0.5.0 pilot, design provider conformance around server operation IDs, idempotency keys and conditional commit/revision. Reuse prepared ZIP/manifest freezing, local journaling, before-mutation intent and local acknowledgement. Replace GitHub-specific refs/body markers/asset IDs with server-owned transaction proof. Keep schema/CLI compatibility and review deletion/recovery ownership before migration. Do not implement or deploy 0.6.0 as part of this batch.

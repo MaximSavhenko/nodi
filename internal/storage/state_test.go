@@ -20,8 +20,10 @@ type barrierTransport struct {
 }
 
 func (b *barrierTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	res, e := b.base.RoundTrip(r)
-	if e == nil && res.StatusCode == 404 && strings.Contains(r.URL.Path, "/git/ref/tags/") {
+	// Each publisher performs multiple preflight GETs. Counting those allowed
+	// one publisher to open the gate by itself. Rendezvous before the actual
+	// atomic reservation POST so both independent writers really contend.
+	if r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/git/refs") {
 		b.mu.Lock()
 		b.count++
 		if b.count == 2 {
@@ -33,7 +35,7 @@ func (b *barrierTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		case <-r.Context().Done():
 		}
 	}
-	return res, e
+	return b.base.RoundTrip(r)
 }
 func TestConcurrentPublicationReservesOneTag(t *testing.T) {
 	mock := testutil.NewGitHub()

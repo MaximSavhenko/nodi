@@ -13,6 +13,6 @@ UpgradeBehavior: uninstallPrevious
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/MaximSavhenko/nodi/releases/download/v0.5.0/nodi-windows-amd64.zip
-  InstallerSha256: 559488D31CB69ADE15F697E42789D40F4EFD6F27C4C22D13585148F704712EEC
+  InstallerSha256: 295C5FFB58748C6C1DE7C52BE9ACC0AB1F3A68267C474130C96DDB314D7080DA
 ManifestType: installer
 ManifestVersion: 1.10.0
