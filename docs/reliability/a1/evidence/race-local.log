@@ -4,5 +4,5 @@ go.exe : go: -race requires cgo; enable cgo by setting CGO_ENABLED=1
 +                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: (go: -race requi...g CGO_ENABLED=1:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
- 
+
 Local race exit: 2; NOT VERIFIED: CGO disabled and no C compiler in PATH
