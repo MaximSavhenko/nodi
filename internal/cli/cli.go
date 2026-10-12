@@ -440,6 +440,23 @@ func cleanText(s string) string {
 	}, s)
 }
 func (a *App) publish(ctx context.Context, o options) error {
+	store, e := a.Store(true)
+	if e != nil {
+		return e
+	}
+	if resumable, ok := store.(storage.PublicationResumer); ok {
+		m, err := resumable.ResumePublish(ctx, o.args[0], o.args[1], o.status, o.version)
+		if err != nil {
+			return err
+		}
+		if m != nil {
+			if err = resumable.AcknowledgePublish(ctx, m.Project, m.Version, o.args[1]); err != nil {
+				return err
+			}
+			fmt.Fprintf(a.Out, "Recovered %s %s (%s). No new version created.\n", m.Project, m.Version, m.Status)
+			return nil
+		}
+	}
 	var metadata map[string]string
 	if o.metadata != "" {
 		f, e := os.Open(o.metadata)
@@ -463,15 +480,19 @@ func (a *App) publish(ctx context.Context, o options) error {
 		return e
 	}
 	defer os.Remove(name)
-	store, e := a.Store(true)
+	fmt.Fprintf(a.Out, "Publishing %s %s: %d files, %d bytes, status %s\n", m.Project, m.Version, len(m.Files), m.ArchiveSize, m.Status)
+	if resumable, ok := store.(storage.PublicationResumer); ok {
+		e = resumable.PublishFrom(ctx, m, name, o.args[1])
+	} else {
+		e = store.Publish(ctx, m, name)
+	}
 	if e != nil {
 		return e
 	}
-	fmt.Fprintf(a.Out, "Publishing %s %s: %d files, %d bytes, status %s\n", m.Project, m.Version, len(m.Files), m.ArchiveSize, m.Status)
-	if e = store.Publish(ctx, m, name); e != nil {
-		return e
-	}
 	fmt.Fprintf(a.Out, "Published %s %s (%s).\n", m.Project, m.Version, m.Status)
+	if resumable, ok := store.(storage.PublicationResumer); ok {
+		return resumable.AcknowledgePublish(ctx, m.Project, m.Version, o.args[1])
+	}
 	return nil
 }
 func (a *App) get(ctx context.Context, store storage.Store, o options) error {

@@ -195,8 +195,8 @@ func TestFailedUploadRetainsDraft(t *testing.T) {
 	if e != nil || len(ms) != 0 {
 		t.Fatal("partial published", e)
 	}
-	if e = g.Publish(context.Background(), m, z); e == nil || !strings.Contains(e.Error(), "already exists") {
-		t.Fatal("overwrote failed draft", e)
+	if e = g.Publish(context.Background(), m, z); e == nil || !strings.Contains(e.Error(), "draft release") {
+		t.Fatal("persistent upload failure was not safely reported", e)
 	}
 }
 func TestRedirectSecurity(t *testing.T) {

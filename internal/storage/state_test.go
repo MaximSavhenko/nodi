@@ -41,6 +41,8 @@ func TestConcurrentPublicationReservesOneTag(t *testing.T) {
 	client := *mock.Server.Client()
 	client.Transport = &barrierTransport{base: client.Transport, ready: make(chan struct{})}
 	g, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, &client)
+	other, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, &client)
+	g.publicationDir, other.publicationDir = t.TempDir(), t.TempDir()
 	root := t.TempDir()
 	os.WriteFile(filepath.Join(root, "part.dxf"), []byte("fictional concurrent test"), 0644)
 	m, z, e := archive.Prepare(context.Background(), root, "demo", "0.1.0", "draft", "", nil)
@@ -50,9 +52,9 @@ func TestConcurrentPublicationReservesOneTag(t *testing.T) {
 	defer os.Remove(z)
 	results := make(chan error, 2)
 	var wg sync.WaitGroup
-	for i := 0; i < 2; i++ {
+	for _, sender := range []*GitHub{g, other} {
 		wg.Add(1)
-		go func() { defer wg.Done(); results <- g.Publish(context.Background(), m, z) }()
+		go func(sender *GitHub) { defer wg.Done(); results <- sender.Publish(context.Background(), m, z) }(sender)
 	}
 	wg.Wait()
 	close(results)
@@ -60,7 +62,7 @@ func TestConcurrentPublicationReservesOneTag(t *testing.T) {
 	for e := range results {
 		if e == nil {
 			successes++
-		} else if strings.Contains(e.Error(), "version conflict") {
+		} else if strings.Contains(e.Error(), "version conflict") || strings.Contains(e.Error(), "version tag already exists") || strings.Contains(e.Error(), "ownership is ambiguous") {
 			conflicts++
 		} else {
 			t.Fatal(e)
@@ -78,7 +80,7 @@ func TestConcurrentPublicationReservesOneTag(t *testing.T) {
 		t.Fatal(state, e)
 	}
 }
-func TestInterruptedPublicationBlocksAutomaticVersion(t *testing.T) {
+func TestInterruptedPublicationResumesOnlyItsJournal(t *testing.T) {
 	mock := testutil.NewGitHub()
 	defer mock.Close()
 	g, _ := NewGitHubWithClient("owner/private", "write-test", mock.Server.URL, mock.Server.URL, mock.Server.Client())
@@ -98,13 +100,11 @@ func TestInterruptedPublicationBlocksAutomaticVersion(t *testing.T) {
 		t.Fatal(state, e)
 	}
 	mock.Configure(func(g *testutil.GitHub) { g.FailUpload = false })
-	if e = g.Publish(context.Background(), m, z); e == nil {
-		t.Fatal("interrupted version replaced")
+	if e = g.Publish(context.Background(), m, z); e != nil {
+		t.Fatal("verified same-operation recovery failed", e)
 	}
 	// A tag reserved before a disconnected release-creation response is also a blocker.
-	if e = g.reserveTag(context.Background(), "orphan/v0.1.0"); e != nil {
-		t.Fatal(e)
-	}
+	mock.SetTag("refs/tags/orphan/v0.1.0", strings.Repeat("a", 40))
 	state, e = g.State(context.Background(), "orphan")
 	if e == nil || state.Version != "0.1.0" || !strings.Contains(e.Error(), "reserved tag") {
 		t.Fatal(state, e)

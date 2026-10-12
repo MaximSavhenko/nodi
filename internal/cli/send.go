@@ -95,15 +95,7 @@ func (a *App) send(ctx context.Context, path string, o options) error {
 	if o.dryRun {
 		return a.previewSend(ctx, source, name, repo, binding, o)
 	}
-	if err := a.publishSource(ctx, o, source, name, repo, binding); err != nil {
-		return err
-	}
-	if binding == nil {
-		if err := saveSendReceipt(source, repo, name); err != nil {
-			return fmt.Errorf("publication completed but local send identity was not saved; inspect nodi info %s --all before retrying: %w", name, err)
-		}
-	}
-	return nil
+	return a.publishSource(ctx, o, source, name, repo, binding)
 }
 
 type sendReceipt struct{ Source, Repository, Name string }

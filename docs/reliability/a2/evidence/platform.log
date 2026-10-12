@@ -1,0 +1,8 @@
+Build PASS: windows/amd64
+Build PASS: darwin/arm64
+Build PASS: darwin/amd64
+nodi 0.4.1 windows/amd64
+Windows native version/help PASS; candidate, not a public release
+PASS: real PowerShell native completer, commands/subcommands/flags/projects/versions/paths and multiple choices.
+Local PowerShell 5.1 completion PASS; PowerShell 7 unavailable in PATH
+Darwin native checks are performed by PR CI; local cross-build is not native execution

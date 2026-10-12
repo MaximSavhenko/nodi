@@ -33,6 +33,7 @@ type GitHub struct {
 	data                                                            map[int64][]byte
 	next                                                            int64
 	Private                                                         bool
+	RepositoryID                                                    int64
 	FailUpload                                                      bool
 	FailFinalize                                                    bool
 	CorruptArchive                                                  bool
@@ -47,7 +48,7 @@ type GitHub struct {
 }
 
 func NewGitHub() *GitHub {
-	g := &GitHub{Private: true, data: map[int64][]byte{}, next: 1, tags: map[string]string{}}
+	g := &GitHub{Private: true, RepositoryID: 101, data: map[int64][]byte{}, next: 1, tags: map[string]string{}}
 	g.Server = httptest.NewTLSServer(http.HandlerFunc(g.serve))
 	return g
 }
@@ -97,7 +98,7 @@ func (g *GitHub) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	respond := func(v any) { w.Header().Set("Content-Type", "application/json"); json.NewEncoder(w).Encode(v) }
 	if p == "" {
-		respond(map[string]any{"id": 101, "private": g.Private, "default_branch": "main"})
+		respond(map[string]any{"id": g.RepositoryID, "private": g.Private, "default_branch": "main"})
 		return
 	}
 	if p == "/git/ref/heads/main" {
