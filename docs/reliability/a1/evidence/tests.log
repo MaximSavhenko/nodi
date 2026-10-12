@@ -1,0 +1,9 @@
+	nodi/cmd/nodi		coverage: 0.0% of statements
+ok  	nodi/internal/archive	0.106s	coverage: 72.2% of statements
+ok  	nodi/internal/cli	2.036s	coverage: 74.1% of statements
+ok  	nodi/internal/config	0.040s	coverage: 64.5% of statements
+ok  	nodi/internal/local	0.040s	coverage: 74.5% of statements
+ok  	nodi/internal/model	0.032s	coverage: 49.4% of statements
+ok  	nodi/internal/project	0.042s	coverage: 79.0% of statements
+ok  	nodi/internal/storage	1.170s	coverage: 78.5% of statements
+	nodi/internal/testutil		coverage: 0.0% of statements

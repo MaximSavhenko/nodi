@@ -1,0 +1,70 @@
+=== RUN   TestRegressionB01AssetSnapshotChanges
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/add
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/remove
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/replace_archive
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/replace_manifest
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/rename
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/resize
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/state
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/same_size_archive_bytes
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/add
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/remove
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_archive
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_manifest
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/rename
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/resize
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/state
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/same_size_archive_bytes
+    delete_regression_test.go:114: changed assets were accepted for deletion
+    delete_regression_test.go:120: changed release was removed: GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:124: approved tag was removed or changed: { {}} GitHub resource unavailable (404): check repository, project and token access
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/releases/4
+    delete_regression_test.go:129: destructive request after asset change: DELETE /repos/owner/private/git/refs/tags/demo%2Fv0.1.1
+--- FAIL: TestRegressionB01AssetSnapshotChanges (0.43s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/add (0.04s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/remove (0.03s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/before_recheck/replace_archive (0.03s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/before_recheck/replace_manifest (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/rename (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/resize (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/state (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/same_size_archive_bytes (0.03s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/add (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/remove (0.03s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_archive (0.03s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_manifest (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/rename (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/resize (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/state (0.02s)
+    --- FAIL: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/same_size_archive_bytes (0.02s)
+=== RUN   TestRegressionB01AssetOrderDoesNotChangeSnapshot
+--- PASS: TestRegressionB01AssetOrderDoesNotChangeSnapshot (0.03s)
+FAIL
+FAIL	nodi/internal/storage	0.469s
+FAIL
+RED exit: 1

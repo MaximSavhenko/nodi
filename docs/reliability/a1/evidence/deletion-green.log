@@ -1,0 +1,82 @@
+=== RUN   TestRegressionB01AssetSnapshotChanges
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/add
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/remove
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/replace_archive
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/replace_manifest
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/rename
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/resize
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/state
+=== RUN   TestRegressionB01AssetSnapshotChanges/before_recheck/same_size_archive_bytes
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/add
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/remove
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_archive
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_manifest
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/rename
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/resize
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/state
+=== RUN   TestRegressionB01AssetSnapshotChanges/after_fresh_plan/same_size_archive_bytes
+--- PASS: TestRegressionB01AssetSnapshotChanges (0.45s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/add (0.04s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/remove (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/replace_archive (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/replace_manifest (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/rename (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/resize (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/state (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/before_recheck/same_size_archive_bytes (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/add (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/remove (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_archive (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/replace_manifest (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/rename (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/resize (0.02s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/state (0.03s)
+    --- PASS: TestRegressionB01AssetSnapshotChanges/after_fresh_plan/same_size_archive_bytes (0.04s)
+=== RUN   TestRegressionB01AssetOrderDoesNotChangeSnapshot
+--- PASS: TestRegressionB01AssetOrderDoesNotChangeSnapshot (0.05s)
+=== RUN   TestDeleteChangesDuringFinalVerification
+=== RUN   TestDeleteChangesDuringFinalVerification/add_asset
+=== RUN   TestDeleteChangesDuringFinalVerification/draft
+=== RUN   TestDeleteChangesDuringFinalVerification/prerelease
+=== RUN   TestDeleteChangesDuringFinalVerification/tag_sha
+--- PASS: TestDeleteChangesDuringFinalVerification (0.12s)
+    --- PASS: TestDeleteChangesDuringFinalVerification/add_asset (0.03s)
+    --- PASS: TestDeleteChangesDuringFinalVerification/draft (0.03s)
+    --- PASS: TestDeleteChangesDuringFinalVerification/prerelease (0.03s)
+    --- PASS: TestDeleteChangesDuringFinalVerification/tag_sha (0.03s)
+=== RUN   TestDeletePreservesOtherProjectsAndVersionHistory
+--- PASS: TestDeletePreservesOtherProjectsAndVersionHistory (0.04s)
+=== RUN   TestDeleteReadOnlyAndDamagedReleaseRefused
+--- PASS: TestDeleteReadOnlyAndDamagedReleaseRefused (0.02s)
+=== RUN   TestDeletePartialFailuresReportExactState
+=== RUN   TestDeletePartialFailuresReportExactState/history
+=== RUN   TestDeletePartialFailuresReportExactState/release
+=== RUN   TestDeletePartialFailuresReportExactState/tag
+=== RUN   TestDeletePartialFailuresReportExactState/verification
+--- PASS: TestDeletePartialFailuresReportExactState (0.10s)
+    --- PASS: TestDeletePartialFailuresReportExactState/history (0.02s)
+    --- PASS: TestDeletePartialFailuresReportExactState/release (0.02s)
+    --- PASS: TestDeletePartialFailuresReportExactState/tag (0.02s)
+    --- PASS: TestDeletePartialFailuresReportExactState/verification (0.03s)
+=== RUN   TestDeleteChangedPlanRefused
+--- PASS: TestDeleteChangedPlanRefused (0.03s)
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/extra_asset
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/missing_tag
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/changed_tag
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/forged_multiple
+=== RUN   TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/status_mismatch
+--- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans (0.11s)
+    --- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/extra_asset (0.02s)
+    --- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/missing_tag (0.02s)
+    --- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/changed_tag (0.02s)
+    --- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/forged_multiple (0.02s)
+    --- PASS: TestDeleteUnknownAssetsMissingOrChangedTagsAndForgedPlans/status_mismatch (0.02s)
+=== RUN   TestDeleteAllStopsAfterPartialFailure
+--- PASS: TestDeleteAllStopsAfterPartialFailure (0.03s)
+=== RUN   TestDeleteDraftWhenReleaseByTagReturns404
+--- PASS: TestDeleteDraftWhenReleaseByTagReturns404 (0.01s)
+=== RUN   TestDeleteRetainsTagWhenInvisibleDraftReplacesRelease
+--- PASS: TestDeleteRetainsTagWhenInvisibleDraftReplacesRelease (0.02s)
+PASS
+ok  	nodi/internal/storage	1.011s

@@ -1,0 +1,6 @@
+Build PASS: windows/amd64
+Build PASS: darwin/arm64
+Build PASS: darwin/amd64
+nodi 0.4.1 windows/amd64
+Windows native version/help PASS; candidate build, not a public release
+PASS: real PowerShell native completer, commands/subcommands/flags/projects/versions/paths and multiple choices.
