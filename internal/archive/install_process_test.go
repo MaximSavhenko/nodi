@@ -52,7 +52,9 @@ func TestRegressionB04CrashNeverPartial(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { child.Process.Kill(); child.Wait() }()
-	deadline := time.Now().Add(20 * time.Second)
+	// File Sync is intentionally performed before publication. Hosted NTFS
+	// runners can take substantially longer than local SSDs for 1200 flushes.
+	deadline := time.Now().Add(120 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, err = os.Lstat(dest); err == nil {
 			child.Process.Kill()
