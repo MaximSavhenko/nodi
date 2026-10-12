@@ -151,6 +151,19 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	if e != nil {
 		return e
 	}
+	if resumable, ok := s.(storage.PublicationResumer); ok {
+		m, err := resumable.ResumePublish(ctx, name, source, o.status, o.version)
+		if err != nil {
+			return err
+		}
+		if m != nil {
+			if err = a.completePublication(ctx, s, *m, source, repo, b); err != nil {
+				return err
+			}
+			fmt.Fprintf(a.Out, "Recovered %s %s (%s). No new version created.\n", m.Project, m.Version, m.Status)
+			return nil
+		}
+	}
 	state, e := s.State(ctx, name)
 	if e != nil {
 		return fmt.Errorf("remote state could not be verified; nothing published: %w", e)
@@ -245,14 +258,30 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 		}
 	}
 	fmt.Fprintln(a.Out, "Uploading...")
-	if e = s.Publish(ctx, m, zip); e != nil {
+	if resumable, ok := s.(storage.PublicationResumer); ok {
+		e = resumable.PublishFrom(ctx, m, zip, source)
+	} else {
+		e = s.Publish(ctx, m, zip)
+	}
+	if e != nil {
 		return e
 	}
 	fmt.Fprintf(a.Out, "Published %s %s (%s).\n", m.Project, m.Version, m.Status)
+	return a.completePublication(ctx, s, m, source, repo, b)
+}
+
+// Acknowledge the exact recovered version only after existing local bookkeeping
+// succeeds. No new receipt format or ownership/binding rule is introduced.
+func (a *App) completePublication(ctx context.Context, s storage.Store, m model.Manifest, source, repo string, b *project.Binding) error {
 	if b != nil {
-		if e = b.SaveVersion(next); e != nil {
-			return fmt.Errorf("remote publication succeeded, but local version record failed; inspect GitHub before retrying: %w", e)
+		if err := b.SaveVersion(m.Version); err != nil {
+			return fmt.Errorf("remote publication succeeded, but local version record failed; repeat the same command: %w", err)
 		}
+	} else if err := saveSendReceipt(source, repo, m.Project); err != nil {
+		return fmt.Errorf("remote publication succeeded, but local send identity was not saved; repeat the same command: %w", err)
+	}
+	if resumable, ok := s.(storage.PublicationResumer); ok {
+		return resumable.AcknowledgePublish(ctx, m.Project, m.Version, source)
 	}
 	return nil
 }

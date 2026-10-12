@@ -14,7 +14,6 @@ import (
 	"nodi/internal/archive"
 	"nodi/internal/config"
 	"nodi/internal/model"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +23,7 @@ import (
 type GitHub struct {
 	repo, token, base, uploads string
 	client                     *http.Client
+	publicationDir             string // Optional isolated configuration root for provider tests.
 }
 type asset struct {
 	ID    int64  `json:"id"`
@@ -34,6 +34,7 @@ type asset struct {
 type release struct {
 	ID         int64   `json:"id"`
 	Tag        string  `json:"tag_name"`
+	Body       string  `json:"body"`
 	Draft      bool    `json:"draft"`
 	Prerelease bool    `json:"prerelease"`
 	Assets     []asset `json:"assets"`
@@ -420,7 +421,7 @@ func (g *GitHub) upload(ctx context.Context, r release, name, mime string, reade
 	}
 	return nil
 }
-func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) error {
+func (g *GitHub) publicationPreflight(ctx context.Context, m model.Manifest, name string) error {
 	if e := m.Validate(); e != nil {
 		return e
 	}
@@ -464,83 +465,6 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 	}
 	if !IsStatus(e, 404) {
 		return e
-	}
-	f, e := os.Open(name)
-	if e != nil {
-		return e
-	}
-	defer f.Close()
-	st, e := f.Stat()
-	if e != nil {
-		return e
-	}
-	if st.Size() != m.ArchiveSize {
-		return fmt.Errorf("package size changed before publication")
-	}
-	input := map[string]any{"tag_name": model.Tag(m.Project, m.Version), "name": m.Project + " " + m.Version, "body": "Nodi schema 1. Status: " + m.Status + ".\n" + m.Description, "draft": true, "prerelease": m.Status == "draft", "make_latest": "false"}
-	// Git refs are created atomically. Draft releases alone do not reserve a tag.
-	if e = g.reserveTag(ctx, model.Tag(m.Project, m.Version)); e != nil {
-		return e
-	}
-	var r release
-	if e = g.json(ctx, "POST", g.endpoint("/releases"), input, &r); e != nil {
-		return fmt.Errorf("release creation was not confirmed; reserved tag retained; inspect GitHub before retrying: %w", e)
-	}
-	if r.ID <= 0 {
-		return fmt.Errorf("GitHub returned an invalid release")
-	}
-	incomplete := func(err error) error {
-		return fmt.Errorf("upload incomplete; draft release %d retained for inspection; no version was released: %w", r.ID, err)
-	}
-	if e = g.upload(ctx, r, model.ArchiveName, "application/zip", f, m.ArchiveSize); e != nil {
-		return incomplete(e)
-	}
-	b, e := json.MarshalIndent(m, "", "  ")
-	if e != nil {
-		return incomplete(e)
-	}
-	if int64(len(b)) > model.MaxManifest {
-		return incomplete(fmt.Errorf("manifest too large"))
-	}
-	if e = g.upload(ctx, r, model.ManifestName, "application/json", bytes.NewReader(b), int64(len(b))); e != nil {
-		return incomplete(e)
-	}
-	var staged release
-	if e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), nil, &staged); e != nil {
-		return incomplete(e)
-	}
-	if staged.ID != r.ID || !staged.Draft || staged.Tag != model.Tag(m.Project, m.Version) {
-		return incomplete(fmt.Errorf("staged release identity or draft state changed; inspect GitHub"))
-	}
-	if e = g.verifyAssets(ctx, staged, m); e != nil {
-		return incomplete(e)
-	}
-	if m.Status == "released" {
-		var completed release
-		if e = g.json(ctx, "PATCH", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), map[string]any{"draft": false, "prerelease": false, "make_latest": "false"}, &completed); e != nil {
-			return fmt.Errorf("release finalization was not confirmed; inspect GitHub release %d before retrying: %w", r.ID, e)
-		}
-		if completed.Draft || completed.Prerelease {
-			return fmt.Errorf("GitHub did not confirm released status")
-		}
-	}
-	var final release
-	if m.Status == "released" {
-		final, e = g.byTag(ctx, model.Tag(m.Project, m.Version))
-	} else {
-		e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(r.ID, 10)), nil, &final)
-	}
-	if e == nil && final.ID != r.ID {
-		e = fmt.Errorf("release identity changed")
-	}
-	if e == nil {
-		_, e = g.manifest(ctx, final)
-	}
-	if e == nil {
-		e = g.verifyAssets(ctx, final, m)
-	}
-	if e != nil {
-		return fmt.Errorf("final package availability was not verified; release %d retained; inspect GitHub before retrying: %w", r.ID, e)
 	}
 	return nil
 }

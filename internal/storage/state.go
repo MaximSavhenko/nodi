@@ -112,32 +112,3 @@ func (g *GitHub) State(ctx context.Context, project string) (ProjectState, error
 	}
 	return state, nil
 }
-func (g *GitHub) reserveTag(ctx context.Context, tag string) error {
-	var repo struct {
-		DefaultBranch string `json:"default_branch"`
-	}
-	if e := g.json(ctx, "GET", g.endpoint(""), nil, &repo); e != nil {
-		return e
-	}
-	if repo.DefaultBranch == "" {
-		return fmt.Errorf("repository needs an initial commit before publication")
-	}
-	var head gitRef
-	if e := g.json(ctx, "GET", g.endpoint("/git/ref/heads/"+url.PathEscape(repo.DefaultBranch)), nil, &head); e != nil {
-		return e
-	}
-	if len(head.Object.SHA) != 40 {
-		return fmt.Errorf("GitHub returned an invalid branch commit")
-	}
-	var reserved gitRef
-	if e := g.json(ctx, "POST", g.endpoint("/git/refs"), map[string]string{"ref": "refs/tags/" + tag, "sha": head.Object.SHA}, &reserved); e != nil {
-		if IsStatus(e, 422) || IsStatus(e, 409) {
-			return fmt.Errorf("version conflict: another author reserved this version; retry the operation: %w", e)
-		}
-		return fmt.Errorf("tag reservation was not confirmed; inspect GitHub before retrying: %w", e)
-	}
-	if reserved.Ref != "refs/tags/"+tag || reserved.Object.SHA != head.Object.SHA {
-		return fmt.Errorf("tag reservation response is inconsistent; inspect GitHub before retrying")
-	}
-	return nil
-}

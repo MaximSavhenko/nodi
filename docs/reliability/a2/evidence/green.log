@@ -1,0 +1,75 @@
+=== RUN   TestB02PublicationAcrossProcesses
+--- PASS: TestB02PublicationAcrossProcesses (0.13s)
+=== RUN   TestRegressionB02InterruptedBoundSend
+=== RUN   TestRegressionB02InterruptedBoundSend/reserve/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/reserve/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/create/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/create/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/archive/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/archive/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/manifest/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/manifest/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/finalize/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/finalize/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/final_read/after=false
+--- PASS: TestRegressionB02InterruptedBoundSend (0.63s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/reserve/after=false (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/reserve/after=true (0.03s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/create/after=false (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/create/after=true (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/archive/after=false (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/archive/after=true (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/manifest/after=false (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/manifest/after=true (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/finalize/after=false (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/finalize/after=true (0.06s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/final_read/after=false (0.07s)
+=== RUN   TestB02UnsafeRecoveryIsReadOnly
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/corrupt_operation
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/corrupt_checkpoint
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/missing_archive
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/changed_archive
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/changed_source
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/different_source
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/foreign_release
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/replaced_release
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/changed_tag
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/foreign_asset
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/replaced_asset
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/incomplete_asset
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/premature_release
+=== RUN   TestB02UnsafeRecoveryIsReadOnly/changed_repository
+--- PASS: TestB02UnsafeRecoveryIsReadOnly (0.59s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/corrupt_operation (0.03s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/corrupt_checkpoint (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/missing_archive (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/changed_archive (0.05s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/changed_source (0.05s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/different_source (0.06s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/foreign_release (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/replaced_release (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/changed_tag (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/foreign_asset (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/replaced_asset (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/incomplete_asset (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/premature_release (0.04s)
+    --- PASS: TestB02UnsafeRecoveryIsReadOnly/changed_repository (0.04s)
+=== RUN   TestB02CompletedRemoteDoesNotNeedLocalArchive
+--- PASS: TestB02CompletedRemoteDoesNotNeedLocalArchive (0.05s)
+=== RUN   TestB02ExplicitDraftRecoveryPreservesDraftContract
+--- PASS: TestB02ExplicitDraftRecoveryPreservesDraftContract (0.04s)
+PASS
+ok  	nodi/internal/cli	1.467s
+=== RUN   TestPublicationJournalTemporaryRecordAndLock
+--- PASS: TestPublicationJournalTemporaryRecordAndLock (0.06s)
+=== RUN   TestPublicationJournalWriteFailurePreventsRemoteMutation
+--- PASS: TestPublicationJournalWriteFailurePreventsRemoteMutation (0.03s)
+=== RUN   TestPublicationOtherProjectIsNotBlocked
+--- PASS: TestPublicationOtherProjectIsNotBlocked (0.06s)
+=== RUN   TestConcurrentPublicationReservesOneTag
+--- PASS: TestConcurrentPublicationReservesOneTag (0.05s)
+=== RUN   TestInterruptedPublicationResumesOnlyItsJournal
+--- PASS: TestInterruptedPublicationResumesOnlyItsJournal (0.05s)
+PASS
+ok  	nodi/internal/storage	0.272s
+GREEN exit: 0

@@ -1,0 +1,37 @@
+=== RUN   TestRegressionB02InterruptedBoundSend
+=== RUN   TestRegressionB02InterruptedBoundSend/reserve/after=false
+=== RUN   TestRegressionB02InterruptedBoundSend/reserve/after=true
+=== RUN   TestRegressionB02InterruptedBoundSend/create/after=false
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 has a reserved tag without a complete release; inspect GitHub before retrying
+=== RUN   TestRegressionB02InterruptedBoundSend/create/after=true
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: release demo/v0.1.0 needs one complete nodi-manifest.json asset
+=== RUN   TestRegressionB02InterruptedBoundSend/archive/after=false
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: release demo/v0.1.0 needs one complete nodi-manifest.json asset
+=== RUN   TestRegressionB02InterruptedBoundSend/archive/after=true
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: release demo/v0.1.0 needs one complete nodi-manifest.json asset
+=== RUN   TestRegressionB02InterruptedBoundSend/manifest/after=false
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: release demo/v0.1.0 needs one complete nodi-manifest.json asset
+=== RUN   TestRegressionB02InterruptedBoundSend/manifest/after=true
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: GitHub and Nodi release statuses differ for demo/v0.1.0 (GitHub draft=true, prerelease=false; manifest status=released); do not toggle GitHub flags alone; preserve the assets and publish a verified new version with a consistent manifest
+=== RUN   TestRegressionB02InterruptedBoundSend/finalize/after=false
+    publication_regression_test.go:110: safe retry did not recover: remote state could not be verified; nothing published: latest version 0.1.0 is incomplete or unavailable; inspect GitHub before retrying: GitHub and Nodi release statuses differ for demo/v0.1.0 (GitHub draft=true, prerelease=false; manifest status=released); do not toggle GitHub flags alone; preserve the assets and publish a verified new version with a consistent manifest
+=== RUN   TestRegressionB02InterruptedBoundSend/finalize/after=true
+    publication_regression_test.go:114: remote completion was not reconciled locally:  <nil>
+=== RUN   TestRegressionB02InterruptedBoundSend/final_read/after=false
+    publication_regression_test.go:114: remote completion was not reconciled locally:  <nil>
+--- FAIL: TestRegressionB02InterruptedBoundSend (0.16s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/reserve/after=false (0.03s)
+    --- PASS: TestRegressionB02InterruptedBoundSend/reserve/after=true (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/create/after=false (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/create/after=true (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/archive/after=false (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/archive/after=true (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/manifest/after=false (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/manifest/after=true (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/finalize/after=false (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/finalize/after=true (0.01s)
+    --- FAIL: TestRegressionB02InterruptedBoundSend/final_read/after=false (0.01s)
+FAIL
+FAIL	nodi/internal/cli	0.179s
+FAIL
+RED exit: 1
