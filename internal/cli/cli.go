@@ -373,7 +373,7 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	switch cmd {
 	case "list":
 		ms, e := store.List(ctx, o.all)
-		if e != nil {
+		if e != nil && len(ms) == 0 {
 			return e
 		}
 		sort.Slice(ms, func(i, j int) bool {
@@ -392,10 +392,16 @@ func (a *App) Run(ctx context.Context, args []string) error {
 			seen[m.Project] = true
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", m.Project, m.Version, m.Status, cleanText(m.Description))
 		}
-		return w.Flush()
+		if err := w.Flush(); err != nil {
+			return err
+		}
+		if e != nil {
+			fmt.Fprintf(a.Out, "Catalog issues: %s\n", cleanText(e.Error()))
+		}
+		return e
 	case "info":
 		ms, e := store.ProjectList(ctx, o.args[0], o.all)
-		if e != nil {
+		if e != nil && len(ms) == 0 {
 			return e
 		}
 		var versions []model.Manifest
@@ -425,7 +431,10 @@ func (a *App) Run(ctx context.Context, args []string) error {
 				fmt.Fprintln(a.Out, "Metadata:", string(b))
 			}
 		}
-		return nil
+		if e != nil {
+			fmt.Fprintf(a.Out, "Catalog issues: %s\n", cleanText(e.Error()))
+		}
+		return e
 	case "get":
 		return a.get(ctx, store, o)
 	}

@@ -83,8 +83,8 @@ func (g *GitHub) State(ctx context.Context, project string) (ProjectState, error
 	}
 	for _, r := range refs {
 		p, v, ok := model.ParseTag(strings.TrimPrefix(r.Ref, "refs/tags/"))
-		if !ok || p != project {
-			continue
+		if !ok || p != project || !gitSHA.MatchString(r.Object.SHA) {
+			return state, fmt.Errorf("invalid reserved project ref %s; inspect GitHub before publishing", r.Ref)
 		}
 		if state.Version == "" || model.CompareVersion(v, state.Version) > 0 {
 			state.Version = v

@@ -294,11 +294,22 @@ func (g *GitHub) list(ctx context.Context, project string, all bool) ([]model.Ma
 		return nil, e
 	}
 	result := []model.Manifest{}
+	var issues []error
+	seen := map[string]int{}
+	for _, r := range rs {
+		if p, _, ok := model.ParseTag(r.Tag); ok && (project == "" || p == project) && (all || !r.Draft && !r.Prerelease) {
+			seen[r.Tag]++
+		}
+	}
 	for _, r := range rs {
 		if p, _, ok := model.ParseTag(r.Tag); !ok || project != "" && p != project {
 			continue
 		}
 		if !all && (r.Draft || r.Prerelease) {
+			continue
+		}
+		if seen[r.Tag] > 1 {
+			issues = append(issues, fmt.Errorf("release %s: duplicate remote versions", r.Tag))
 			continue
 		}
 		if r.Draft {
@@ -308,7 +319,13 @@ func (g *GitHub) list(ctx context.Context, project string, all bool) ([]model.Ma
 		}
 		m, e := g.manifest(ctx, r)
 		if e != nil {
-			return nil, fmt.Errorf("release %s: %w", r.Tag, e)
+			// Authentication, network and inventory failures are never presented
+			// as a successful partial catalog.
+			if IsStatus(e, 401) || IsStatus(e, 403) || ctx.Err() != nil {
+				return nil, e
+			}
+			issues = append(issues, fmt.Errorf("release %s: %w", r.Tag, e))
+			continue
 		}
 		result = append(result, m)
 	}
@@ -318,7 +335,7 @@ func (g *GitHub) list(ctx context.Context, project string, all bool) ([]model.Ma
 		}
 		return model.CompareVersion(result[i].Version, result[j].Version) > 0
 	})
-	return result, nil
+	return result, errors.Join(issues...)
 }
 func (g *GitHub) byTag(ctx context.Context, tag string) (release, error) {
 	var r release
@@ -345,16 +362,38 @@ func (g *GitHub) Get(ctx context.Context, project, version string) (model.Manife
 		}
 		return g.manifest(ctx, r)
 	}
-	ms, e := g.ProjectList(ctx, project, false)
+	if e := g.VerifyPrivate(ctx); e != nil {
+		return model.Manifest{}, e
+	}
+	rs, e := g.releases(ctx)
 	if e != nil {
 		return model.Manifest{}, e
 	}
-	for _, m := range ms {
-		if m.Project == project {
-			return m, nil
+	var latest *release
+	latestVersion := ""
+	duplicates := false
+	for i, r := range rs {
+		p, v, ok := model.ParseTag(r.Tag)
+		if !ok || p != project || r.Draft || r.Prerelease {
+			continue
+		}
+		if latest == nil || model.CompareVersion(v, latestVersion) > 0 {
+			latest = &rs[i]
+			latestVersion = v
+			duplicates = false
+		} else if v == latestVersion {
+			duplicates = true
 		}
 	}
-	return model.Manifest{}, fmt.Errorf("released project %q is unavailable", project)
+	if latest == nil {
+		return model.Manifest{}, fmt.Errorf("released project %q is unavailable", project)
+	}
+	if duplicates {
+		return model.Manifest{}, fmt.Errorf("duplicate highest released version %s; latest is NOT VERIFIED", latestVersion)
+	}
+	// Validate only the selected highest released version. Never downgrade on
+	// a damaged latest or fetch old manifests to decide which version is latest.
+	return g.manifest(ctx, *latest)
 }
 func (g *GitHub) Download(ctx context.Context, m model.Manifest, w io.Writer) error {
 	if e := m.Validate(); e != nil {
@@ -427,6 +466,13 @@ func (g *GitHub) publicationPreflight(ctx context.Context, m model.Manifest, nam
 	}
 	if e := g.VerifyPrivate(ctx); e != nil {
 		return e
+	}
+	state, e := g.State(ctx, m.Project)
+	if e != nil {
+		return fmt.Errorf("version high-water mark could not be verified: %w", e)
+	}
+	if state.Version != "" && model.CompareVersion(m.Version, state.Version) <= 0 {
+		return fmt.Errorf("version conflict: must be newer than reserved/releases/deletion history %s", state.Version)
 	}
 	used, e := g.tombstones(ctx, m.Project)
 	if e != nil {
