@@ -483,7 +483,7 @@ func (g *GitHub) publicationPreflight(ctx context.Context, m model.Manifest, nam
 	}
 	for version := range used {
 		if model.CompareVersion(m.Version, version) <= 0 {
-			return fmt.Errorf("version %s was deleted or predates deletion history %s; choose a newer version", m.Version, version)
+			return fmt.Errorf("version conflict: version %s was deleted or predates deletion history %s; choose a newer version", m.Version, version)
 		}
 	}
 	hash, size, e := archive.HashFile(name)
@@ -501,16 +501,16 @@ func (g *GitHub) publicationPreflight(ctx context.Context, m model.Manifest, nam
 	}
 	for _, r := range rs {
 		if r.Tag == model.Tag(m.Project, m.Version) {
-			return fmt.Errorf("version already exists (including draft); choose a new version")
+			return fmt.Errorf("version conflict: version already exists (including draft); choose a new version")
 		}
 		if p, v, ok := model.ParseTag(r.Tag); ok && p == m.Project && model.CompareVersion(m.Version, v) <= 0 {
-			return fmt.Errorf("version must be newer than existing %s; choose a newer --version or use nodi send PATH", v)
+			return fmt.Errorf("version conflict: version must be newer than existing %s; choose a newer --version or use nodi send PATH", v)
 		}
 	}
 	var ref any
 	e = g.json(ctx, "GET", g.endpoint("/git/ref/tags/"+url.PathEscape(model.Tag(m.Project, m.Version))), nil, &ref)
 	if e == nil {
-		return fmt.Errorf("version tag already exists; choose a new version")
+		return fmt.Errorf("version conflict: version tag already exists; choose a new version")
 	}
 	if !IsStatus(e, 404) {
 		return e

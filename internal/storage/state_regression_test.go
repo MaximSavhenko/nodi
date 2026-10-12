@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"net/http"
 	"nodi/internal/archive"
 	"nodi/internal/testutil"
 	"os"
@@ -28,6 +29,51 @@ func TestRegressionB07HealthyLatestIgnoresDamagedHistory(t *testing.T) {
 	if err == nil {
 		t.Fatal("damaged history silently hidden")
 	}
+}
+
+type lateReleaseTransport struct {
+	base  http.RoundTripper
+	mock  *testutil.GitHub
+	id    int64
+	reads int
+}
+
+func (f *lateReleaseTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method == "GET" && strings.HasSuffix(req.URL.Path, "/releases") {
+		f.reads++
+		if f.reads == 2 {
+			f.mock.AlterRelease(f.id, func(r *testutil.Release) { r.Tag = "demo/v0.1.2"; r.Draft = true })
+		}
+	}
+	return f.base.RoundTrip(req)
+}
+func TestRegressionB08LateReleaseConflict(t *testing.T) {
+	g, mock, source := deleteFixture(t)
+	ctx := context.Background()
+	other, err := g.byTag(ctx, "other/v0.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := mock.Server.Client()
+	client.Transport = &lateReleaseTransport{base: client.Transport, mock: mock, id: other.ID}
+	g.client = client
+	m, z, err := archive.Prepare(ctx, source, "demo", "0.1.2", "released", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(z)
+	mock.Configure(func(m *testutil.GitHub) { m.Requests = nil })
+	err = g.Publish(ctx, m, z)
+	if err == nil || !strings.Contains(err.Error(), "version conflict") {
+		t.Fatal("late foreign release must be a safe version conflict", err)
+	}
+	mock.Configure(func(m *testutil.GitHub) {
+		for _, r := range m.Requests {
+			if !strings.HasPrefix(r, "GET ") {
+				t.Fatal("late conflict caused mutation", r)
+			}
+		}
+	})
 }
 
 func TestB07DamagedHighestNeverDowngrades(t *testing.T) {

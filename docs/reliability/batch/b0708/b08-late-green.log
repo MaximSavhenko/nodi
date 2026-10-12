@@ -1,0 +1,8 @@
+=== RUN   TestRegressionB08LateReleaseConflict
+--- PASS: TestRegressionB08LateReleaseConflict (0.16s)
+=== RUN   TestRegressionB08ReservedHighWaterMark
+--- PASS: TestRegressionB08ReservedHighWaterMark (0.15s)
+=== RUN   TestConcurrentPublicationReservesOneTag
+--- PASS: TestConcurrentPublicationReservesOneTag (0.05s)
+PASS
+ok  	nodi/internal/storage	0.385s
