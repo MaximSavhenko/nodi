@@ -10,7 +10,7 @@
         Status: released
         Uploading...
         Published demo 0.1.0 (released).
-        
+
 --- FAIL: TestRegressionB09ExclusionsVisible (0.06s)
 === RUN   TestRegressionB09ExplicitConfig
     selection_regression_test.go:28: unknown option "--include" for send

@@ -7,7 +7,7 @@
         +                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             + CategoryInfo          : OperationStopped: (Installed binary failed version check:String) [], RuntimeException
             + FullyQualifiedErrorId : Installed binary failed version check
-         
+
 === RUN   TestRegressionB10InstallerPreservesOldBinary/invalid
     installer_regression_test.go:78: installer must fail and preserve old binary (invalid): err=<nil> read=<nil>
         not a Nodi version
@@ -24,7 +24,7 @@
         +                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             + CategoryInfo          : OperationStopped: (Installed binary failed version check:String) [], RuntimeException
             + FullyQualifiedErrorId : Installed binary failed version check
-         
+
 --- FAIL: TestRegressionB10InstallerPreservesOldBinary (10.62s)
     --- FAIL: TestRegressionB10InstallerPreservesOldBinary/exit7 (2.78s)
     --- FAIL: TestRegressionB10InstallerPreservesOldBinary/invalid (2.45s)

@@ -11,7 +11,7 @@
         Status: released
         Uploading...
         Published part 0.1.0 (released).
-        
+
 === RUN   TestRegressionA4FirstSendIdentity/directory
     identity_recovery_test.go:39: Package: files-001
         Storage: owner/private
@@ -24,7 +24,7 @@
         Status: released
         Uploading...
         Published files-001 0.1.0 (released).
-        
+
 --- FAIL: TestRegressionA4FirstSendIdentity (0.20s)
     --- FAIL: TestRegressionA4FirstSendIdentity/file (0.10s)
     --- FAIL: TestRegressionA4FirstSendIdentity/directory (0.10s)
