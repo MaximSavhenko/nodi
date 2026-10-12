@@ -1,0 +1,6 @@
+=== RUN   TestRegressionB08ReservedHighWaterMark
+--- PASS: TestRegressionB08ReservedHighWaterMark (0.16s)
+=== RUN   TestConcurrentPublicationReservesOneTag
+--- PASS: TestConcurrentPublicationReservesOneTag (0.10s)
+PASS
+ok  	nodi/internal/storage	0.283s

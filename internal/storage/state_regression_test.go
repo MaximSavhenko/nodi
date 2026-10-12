@@ -93,6 +93,9 @@ func TestRegressionB08ReservedHighWaterMark(t *testing.T) {
 	if err = g.Publish(ctx, m, z); err == nil {
 		t.Fatal("published below reserved high-water mark")
 	}
+	if !strings.Contains(err.Error(), "version conflict") {
+		t.Fatal("reservation was not identified as a version conflict", err)
+	}
 	mock.Configure(func(m *testutil.GitHub) {
 		for _, r := range m.Requests {
 			if !strings.HasPrefix(r, "GET ") {
