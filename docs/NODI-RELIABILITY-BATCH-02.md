@@ -31,6 +31,8 @@ No merge/release is complete merely because code compiles or a branch is pushed.
 
 ## Contract changes and limits
 
+Historical CI failures are preserved in Actions: B04 run 38251511855 timed out at the original 20-second NTFS flush barrier; the 120-second bound passed on the updated B04 HEAD. Final run 38255677783 detected inherited PowerShell 7 module paths preventing a PowerShell 5.1 fixture from reaching its injected phase. Child environments now resolve their own PowerShell modules, Windows fixtures retain their native home, and negative tests assert the actual failure reason to prevent false positives from unrelated environment errors. Only fresh successful checks on the corrected HEAD authorize delivery.
+
 - Normal `send PATH` stays no-prompt; exact delete remains confirmation-gated. Recovery uses the same command/source/selection/status/version and original IDs, not matching names or contents.
 - Optional `--include` is additive. Private-config/key/credential/path rules cannot be bypassed. Explicit ordinary config.json and build/dist roots are supported.
 - Partial catalog results are displayed together with errors and nonzero exit. Latest selection never silently downgrades.

@@ -73,7 +73,11 @@ func main(){
 				script, _ = filepath.Abs(filepath.Join("..", "..", "scripts", "install-macos.sh"))
 				cmd = exec.Command("sh", script, "--bundle", bundle, "--no-path", "--no-completion")
 			}
-			cmd.Env = append(os.Environ(), "HOME="+filepath.Join(root, "home"), "NODI_INSTALL_TEST_PHASE="+phase, "NODI_INSTALL_TEST_MARKER="+marker)
+			cmd.Env = installerFixtureEnvironment(runtime.GOOS == "windows")
+			if runtime.GOOS == "darwin" {
+				cmd.Env = append(cmd.Env, "HOME="+filepath.Join(root, "home"))
+			}
+			cmd.Env = append(cmd.Env, "NODI_INSTALL_TEST_PHASE="+phase, "NODI_INSTALL_TEST_MARKER="+marker)
 			var out bytes.Buffer
 			cmd.Stdout = &out
 			cmd.Stderr = &out
