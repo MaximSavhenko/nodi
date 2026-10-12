@@ -469,6 +469,9 @@ func (g *GitHub) publicationPreflight(ctx context.Context, m model.Manifest, nam
 	}
 	state, e := g.State(ctx, m.Project)
 	if e != nil {
+		if state.Version != "" && model.CompareVersion(m.Version, state.Version) <= 0 {
+			return fmt.Errorf("version conflict: remote version %s is reserved, incomplete or unavailable: %w", state.Version, e)
+		}
 		return fmt.Errorf("version high-water mark could not be verified: %w", e)
 	}
 	if state.Version != "" && model.CompareVersion(m.Version, state.Version) <= 0 {
