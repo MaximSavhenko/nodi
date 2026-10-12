@@ -1,0 +1,6 @@
+=== RUN   TestRegressionB05WindowsPathCase
+    path_identity_test.go:48: case alias created a spurious version 2 <nil>
+--- FAIL: TestRegressionB05WindowsPathCase (0.30s)
+FAIL
+FAIL	nodi/internal/cli	0.324s
+FAIL

@@ -39,6 +39,14 @@ func TestRegressionB05WindowsPathCase(t *testing.T) {
 	if err != nil || r == nil || r.Name != "demo" {
 		t.Fatal(r, err)
 	}
+	s, err := a.StoreFor("owner/private", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions, err := s.ProjectList(context.Background(), "demo", true)
+	if err != nil || len(versions) != 1 {
+		t.Fatal("case alias created a spurious version", len(versions), err)
+	}
 }
 
 func TestB05LegacyAndRecreatedSource(t *testing.T) {
