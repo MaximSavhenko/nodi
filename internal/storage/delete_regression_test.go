@@ -163,3 +163,67 @@ func TestRegressionB01AssetOrderDoesNotChangeSnapshot(t *testing.T) {
 		t.Fatal("final reorder was not injected")
 	}
 }
+
+func TestDeleteChangesDuringFinalVerification(t *testing.T) {
+	for _, change := range []string{"add_asset", "draft", "prerelease", "tag_sha"} {
+		t.Run(change, func(t *testing.T) {
+			g, mock, _ := deleteFixture(t)
+			ctx := context.Background()
+			plan, err := g.PlanDelete(ctx, "demo", "0.1.1", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			item := plan.Items[0]
+			var r release
+			if err = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &r); err != nil {
+				t.Fatal(err)
+			}
+			zip, err := findAsset(r, model.ArchiveName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			freshPlanPassed, injected := false, false
+			g.client.Transport = deletionMutationTransport{g.client.Transport, func(req *http.Request, res *http.Response) {
+				if req.Method == "POST" && strings.HasSuffix(req.URL.Path, "/git/refs") && res.StatusCode >= 200 && res.StatusCode < 300 {
+					freshPlanPassed = true
+				}
+				if freshPlanPassed && !injected && req.Method == "GET" && strings.HasSuffix(req.URL.Path, "/releases/assets/"+strconv.FormatInt(zip.ID, 10)) && res.StatusCode == 200 {
+					injected = true
+					if change == "tag_sha" {
+						mock.SetTag("refs/tags/"+item.Tag, strings.Repeat("b", 40))
+						return
+					}
+					mock.AlterRelease(item.ReleaseID, func(r *testutil.Release) {
+						switch change {
+						case "add_asset":
+							r.Assets = append(r.Assets, testutil.Asset{ID: 99999, Name: "late-original.step", Size: 123, State: "uploaded"})
+						case "draft":
+							r.Draft = true
+						case "prerelease":
+							r.Prerelease = true
+						}
+					})
+				}
+			}}
+			if err = g.Delete(ctx, plan); err == nil {
+				t.Fatal("change during archive verification was accepted")
+			}
+			if !injected {
+				t.Fatal("mutation during final archive verification was not injected")
+			}
+			if err = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &r); err != nil {
+				t.Fatal("changed release was removed:", err)
+			}
+			if _, err = g.tagRef(ctx, item.Tag); err != nil {
+				t.Fatal("changed release tag was removed:", err)
+			}
+			mock.Configure(func(g *testutil.GitHub) {
+				for _, req := range g.Requests {
+					if strings.HasPrefix(req, "DELETE ") {
+						t.Error("destructive request during verification change:", req)
+					}
+				}
+			})
+		})
+	}
+}

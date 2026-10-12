@@ -12,9 +12,11 @@ import (
 
 // Deletion is a verified snapshot, not a name mask. Provider details stay here.
 type Deletion struct {
-	Manifest    model.Manifest
-	ReleaseID   int64
-	Tag, TagSHA string
+	Manifest          model.Manifest
+	ReleaseID         int64
+	Tag, TagSHA       string
+	Assets            []asset
+	Draft, Prerelease bool
 }
 type DeletionPlan struct {
 	Project, Version string
@@ -96,7 +98,10 @@ func (g *GitHub) PlanDelete(ctx context.Context, project, version string, all bo
 		if e != nil {
 			return plan, fmt.Errorf("release %s tag ownership could not be verified; deletion refused: %w", r.Tag, e)
 		}
-		plan.Items = append(plan.Items, Deletion{m, r.ID, r.Tag, ref.Object.SHA})
+		plan.Items = append(plan.Items, Deletion{
+			Manifest: m, ReleaseID: r.ID, Tag: r.Tag, TagSHA: ref.Object.SHA,
+			Assets: append([]asset(nil), r.Assets...), Draft: r.Draft, Prerelease: r.Prerelease,
+		})
 	}
 	if len(plan.Items) == 0 {
 		return plan, fmt.Errorf("no matching releases for %s (already deleted or unavailable); run nodi info %s --all; orphan tags require separate recovery", project, project)
@@ -112,11 +117,32 @@ func sameDeletionPlan(a, b DeletionPlan) bool {
 	}
 	for i, x := range a.Items {
 		y := b.Items[i]
-		if x.ReleaseID != y.ReleaseID || x.Tag != y.Tag || x.TagSHA != y.TagSHA || !sameManifest(x.Manifest, y.Manifest) {
+		if x.ReleaseID != y.ReleaseID || x.Tag != y.Tag || x.TagSHA != y.TagSHA || x.Draft != y.Draft || x.Prerelease != y.Prerelease || !sameAssets(x.Assets, y.Assets) || !sameManifest(x.Manifest, y.Manifest) {
 			return false
 		}
 	}
 	return true
+}
+
+// Asset order is not identity. Compare full metadata without mutating either
+// snapshot, including IDs even when replacement assets contain identical bytes.
+func sameAssets(a, b []asset) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	x, y := append([]asset(nil), a...), append([]asset(nil), b...)
+	sort.Slice(x, func(i, j int) bool { return x[i].ID < x[j].ID })
+	sort.Slice(y, func(i, j int) bool { return y[i].ID < y[j].ID })
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sameDeletionRelease(item Deletion, r release) bool {
+	return r.ID == item.ReleaseID && r.Tag == item.Tag && r.Draft == item.Draft && r.Prerelease == item.Prerelease && sameAssets(item.Assets, r.Assets)
 }
 func (g *GitHub) preserveDeletedVersion(ctx context.Context, item Deletion) error {
 	tag := deletedTag(item.Manifest.Project, item.Manifest.Version)
@@ -188,15 +214,32 @@ func (g *GitHub) Delete(ctx context.Context, plan DeletionPlan) error {
 		if e != nil {
 			return fail(e)
 		}
+		if !sameDeletionRelease(item, current) {
+			return fail(fmt.Errorf("release or assets changed after confirmation"))
+		}
 		m, e := g.manifest(ctx, current)
 		if e != nil {
 			return fail(e)
+		}
+		if !sameManifest(m, item.Manifest) {
+			return fail(fmt.Errorf("manifest changed after confirmation"))
+		}
+		if e = g.verifyAssets(ctx, current, item.Manifest); e != nil {
+			return fail(fmt.Errorf("assets failed final SHA-256 verification: %w", e))
+		}
+		// Hashing may take time. Re-read the complete release after it so an
+		// asset added or replaced during verification is not knowingly deleted.
+		if e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current); e != nil {
+			return fail(e)
+		}
+		if !sameDeletionRelease(item, current) {
+			return fail(fmt.Errorf("release or assets changed during final verification"))
 		}
 		ref, e := g.tagRef(ctx, item.Tag)
 		if e != nil {
 			return fail(e)
 		}
-		if current.ID != item.ReleaseID || current.Tag != item.Tag || !sameManifest(m, item.Manifest) || ref.Object.SHA != item.TagSHA {
+		if ref.Object.SHA != item.TagSHA {
 			return fail(fmt.Errorf("release or tag changed after confirmation"))
 		}
 		e = g.json(ctx, "DELETE", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, nil)
