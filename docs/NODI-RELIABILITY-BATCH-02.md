@@ -31,6 +31,8 @@ No merge/release is complete merely because code compiles or a branch is pushed.
 
 ## Contract changes and limits
 
+The strengthened B05 regression also requires one unchanged version after a file-case alias send. It exposed two versions on the earlier identity fix. Directory-entry spelling is now canonicalized using SameFile before packaging, preserving both the established identity and unchanged-file behavior. Separate case-content RED/GREEN evidence is in `batch/b0506`. The fix was applied to PR #9 and propagated through dependent PRs without force pushes; integration paused until their fresh HEAD checks passed.
+
 Historical CI failures are preserved in Actions: B04 run 38251511855 timed out at the original 20-second NTFS flush barrier; the 120-second bound passed on the updated B04 HEAD. Final run 38255677783 detected inherited PowerShell 7 module paths preventing a PowerShell 5.1 fixture from reaching its injected phase. Child environments now resolve their own PowerShell modules, Windows fixtures retain their native home, and negative tests assert the actual failure reason to prevent false positives from unrelated environment errors. Only fresh successful checks on the corrected HEAD authorize delivery.
 
 - Normal `send PATH` stays no-prompt; exact delete remains confirmation-gated. Recovery uses the same command/source/selection/status/version and original IDs, not matching names or contents.
