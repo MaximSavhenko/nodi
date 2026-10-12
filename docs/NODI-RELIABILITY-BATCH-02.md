@@ -45,4 +45,6 @@ Historical CI failures are preserved in Actions: B04 run 38251511855 timed out a
 
 ## Nodi Server 0.6.0
 
+Final native review also exercised scheduling where a competing writer completed a reservation between preflight reads. A known occupied version now reports `version conflict` even when its release is still incomplete, while unknown/network state remains a conservative verification error. Additional conflict-classification RED/GREEN logs are in `batch/b0708`; all ownership/hash/no-write guards remain in place. A Windows fresh-profile check on the B05 HEAD failed once and passed on a same-HEAD job rerun; no assertion was removed or skipped.
+
 After a stable 0.5.0 pilot, design provider conformance around server operation IDs, idempotency keys and conditional commit/revision. Reuse prepared ZIP/manifest freezing, local journaling, before-mutation intent and local acknowledgement. Replace GitHub-specific refs/body markers/asset IDs with server-owned transaction proof. Keep schema/CLI compatibility and review deletion/recovery ownership before migration. Do not implement or deploy 0.6.0 as part of this batch.
