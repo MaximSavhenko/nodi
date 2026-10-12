@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"nodi/internal/model"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ type Deletion struct {
 	Manifest          model.Manifest
 	ReleaseID         int64
 	Tag, TagSHA       string
+	Body              string
 	Assets            []asset
 	Draft, Prerelease bool
 }
@@ -70,6 +72,24 @@ func (g *GitHub) PlanDelete(ctx context.Context, project, version string, all bo
 	if e := g.VerifyPrivate(ctx); e != nil {
 		return plan, e
 	}
+	root, e := g.deletionRoot(project)
+	if e != nil {
+		return plan, e
+	}
+	if _, e = os.Lstat(root); e == nil {
+		j, e := g.pendingDeletion(root)
+		if e != nil {
+			return plan, e
+		}
+		if j != nil {
+			if j.Operation.Plan.Version != version || j.Operation.Plan.All != all {
+				return plan, fmt.Errorf("unfinished deletion has a different exact selection")
+			}
+			return j.Operation.Plan, nil
+		}
+	} else if !os.IsNotExist(e) {
+		return plan, e
+	}
 	rs, e := g.releases(ctx)
 	if e != nil {
 		return plan, e
@@ -100,7 +120,7 @@ func (g *GitHub) PlanDelete(ctx context.Context, project, version string, all bo
 		}
 		plan.Items = append(plan.Items, Deletion{
 			Manifest: m, ReleaseID: r.ID, Tag: r.Tag, TagSHA: ref.Object.SHA,
-			Assets: append([]asset(nil), r.Assets...), Draft: r.Draft, Prerelease: r.Prerelease,
+			Body: r.Body, Assets: append([]asset(nil), r.Assets...), Draft: r.Draft, Prerelease: r.Prerelease,
 		})
 	}
 	if len(plan.Items) == 0 {
@@ -117,7 +137,7 @@ func sameDeletionPlan(a, b DeletionPlan) bool {
 	}
 	for i, x := range a.Items {
 		y := b.Items[i]
-		if x.ReleaseID != y.ReleaseID || x.Tag != y.Tag || x.TagSHA != y.TagSHA || x.Draft != y.Draft || x.Prerelease != y.Prerelease || !sameAssets(x.Assets, y.Assets) || !sameManifest(x.Manifest, y.Manifest) {
+		if x.Body != y.Body || x.ReleaseID != y.ReleaseID || x.Tag != y.Tag || x.TagSHA != y.TagSHA || x.Draft != y.Draft || x.Prerelease != y.Prerelease || !sameAssets(x.Assets, y.Assets) || !sameManifest(x.Manifest, y.Manifest) {
 			return false
 		}
 	}
@@ -142,7 +162,7 @@ func sameAssets(a, b []asset) bool {
 }
 
 func sameDeletionRelease(item Deletion, r release) bool {
-	return r.ID == item.ReleaseID && r.Tag == item.Tag && r.Draft == item.Draft && r.Prerelease == item.Prerelease && sameAssets(item.Assets, r.Assets)
+	return r.Body == item.Body && r.ID == item.ReleaseID && r.Tag == item.Tag && r.Draft == item.Draft && r.Prerelease == item.Prerelease && sameAssets(item.Assets, r.Assets)
 }
 func (g *GitHub) preserveDeletedVersion(ctx context.Context, item Deletion) error {
 	tag := deletedTag(item.Manifest.Project, item.Manifest.Version)
@@ -184,94 +204,74 @@ func (g *GitHub) deletionState(ctx context.Context, item Deletion) string {
 	}
 	return fmt.Sprintf("release %d: %s; tag %s: %s; version-history ref: %s", item.ReleaseID, status(re), item.Tag, tagStatus, status(he))
 }
+func (g *GitHub) verifyDeletionRelease(ctx context.Context, item Deletion) error {
+	var current release
+	if err := g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current); err != nil {
+		return err
+	}
+	if !sameDeletionRelease(item, current) {
+		return fmt.Errorf("release or assets changed after confirmation")
+	}
+	m, err := g.manifest(ctx, current)
+	if err != nil {
+		return err
+	}
+	if !sameManifest(m, item.Manifest) {
+		return fmt.Errorf("manifest changed after confirmation")
+	}
+	if err = g.verifyAssets(ctx, current, item.Manifest); err != nil {
+		return fmt.Errorf("assets failed final SHA-256 verification: %w", err)
+	}
+	if err = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current); err != nil {
+		return err
+	}
+	if !sameDeletionRelease(item, current) {
+		return fmt.Errorf("release or assets changed during final verification")
+	}
+	return nil
+}
 func (g *GitHub) Delete(ctx context.Context, plan DeletionPlan) error {
-	// Even a token saved in the write slot must have real write permission.
-	if e := g.CheckAccess(ctx, true); e != nil {
-		return fmt.Errorf("deletion denied; run nodi setup --write: %w", e)
+	if err := g.CheckAccess(ctx, true); err != nil {
+		return fmt.Errorf("deletion denied; run nodi setup --write: %w", err)
 	}
-	fresh, e := g.PlanDelete(ctx, plan.Project, plan.Version, plan.All)
-	if e != nil {
-		return e
+	_, unlock, err := g.lockPublication(plan.Project)
+	if err != nil {
+		return err
 	}
-	if !sameDeletionPlan(plan, fresh) {
-		return fmt.Errorf("deletion selection changed; repeat dry-run and confirmation")
+	defer unlock()
+	root, err := g.deletionRoot(plan.Project)
+	if err != nil {
+		return err
 	}
-	// Preserve all selected numbers before removing anything. These refs are
-	// append-only, share the old tag commit, and are never completion entries.
-	for _, item := range plan.Items {
-		if e = g.preserveDeletedVersion(ctx, item); e != nil {
-			return e
-		}
+	if err = archiveCheckDeletionRoot(root); err != nil {
+		return err
 	}
-	for i, item := range plan.Items {
-		fail := func(err error) error {
-			return fmt.Errorf("deletion stopped at %s; %d earlier releases completed, %d later releases untouched; %s; retry only after inspection: %w", item.Tag, i, len(plan.Items)-i-1, g.deletionState(ctx, item), err)
+	j, err := g.pendingDeletion(root)
+	if err != nil {
+		return err
+	}
+	if j == nil {
+		fresh, err := g.PlanDelete(ctx, plan.Project, plan.Version, plan.All)
+		if err != nil {
+			return err
 		}
-		// GitHub's release-by-tag endpoint only returns published releases.
-		// The approved ID also works for drafts and prevents identity changes.
-		var current release
-		e := g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current)
-		if e != nil {
-			return fail(e)
+		if !sameDeletionPlan(plan, fresh) {
+			return fmt.Errorf("deletion selection changed; repeat dry-run and confirmation")
 		}
-		if !sameDeletionRelease(item, current) {
-			return fail(fmt.Errorf("release or assets changed after confirmation"))
+		repo, err := g.publicationRepository(ctx)
+		if err != nil {
+			return err
 		}
-		m, e := g.manifest(ctx, current)
-		if e != nil {
-			return fail(e)
+		j, err = g.newDeletion(root, plan, repo.ID)
+		if err != nil {
+			return err
 		}
-		if !sameManifest(m, item.Manifest) {
-			return fail(fmt.Errorf("manifest changed after confirmation"))
-		}
-		if e = g.verifyAssets(ctx, current, item.Manifest); e != nil {
-			return fail(fmt.Errorf("assets failed final SHA-256 verification: %w", e))
-		}
-		// Hashing may take time. Re-read the complete release after it so an
-		// asset added or replaced during verification is not knowingly deleted.
-		if e = g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &current); e != nil {
-			return fail(e)
-		}
-		if !sameDeletionRelease(item, current) {
-			return fail(fmt.Errorf("release or assets changed during final verification"))
-		}
-		ref, e := g.tagRef(ctx, item.Tag)
-		if e != nil {
-			return fail(e)
-		}
-		if ref.Object.SHA != item.TagSHA {
-			return fail(fmt.Errorf("release or tag changed after confirmation"))
-		}
-		e = g.json(ctx, "DELETE", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, nil)
-		var r release
-		verify := g.json(ctx, "GET", g.endpoint("/releases/"+strconv.FormatInt(item.ReleaseID, 10)), nil, &r)
-		if e != nil || !IsStatus(verify, 404) {
-			return fail(fmt.Errorf("release deletion: %v; verification: %v", e, verify))
-		}
-		// A replacement Release must not have appeared under the same tag.
-		if _, e = g.byTag(ctx, item.Tag); !IsStatus(e, 404) {
-			return fail(fmt.Errorf("release-by-tag absence not verified: %v", e))
-		}
-		// A replacement draft is invisible to release-by-tag. Check the complete
-		// authenticated release inventory before removing its shared tag.
-		remaining, e := g.releases(ctx)
-		if e != nil {
-			return fail(fmt.Errorf("release inventory absence not verified: %w", e))
-		}
-		for _, r := range remaining {
-			if r.Tag == item.Tag {
-				return fail(fmt.Errorf("replacement release %d exists under %s; tag retained", r.ID, item.Tag))
-			}
-		}
-		ref, e = g.tagRef(ctx, item.Tag)
-		if e != nil || ref.Object.SHA != item.TagSHA {
-			return fail(fmt.Errorf("tag changed or cannot be verified; retained: %v", e))
-		}
-		e = g.json(ctx, "DELETE", g.endpoint("/git/refs/tags/"+url.PathEscape(item.Tag)), nil, nil)
-		_, verify = g.tagRef(ctx, item.Tag)
-		if e != nil || !IsStatus(verify, 404) {
-			return fail(fmt.Errorf("tag deletion: %v; verification: %v", e, verify))
-		}
+	} else if !sameDeletionPlan(plan, j.Operation.Plan) {
+		return fmt.Errorf("deletion selection changed; retained operation requires its exact confirmation")
+	}
+	if err = g.continueDeletion(ctx, j); err != nil {
+		item := j.Operation.Plan.Items[j.State.Item]
+		return fmt.Errorf("deletion stopped at %s; %d earlier releases completed, %d later releases untouched; %s; repeat the same delete and confirmation for checked recovery: %w", item.Tag, j.State.Item, len(plan.Items)-j.State.Item-1, g.deletionState(ctx, item), err)
 	}
 	return nil
 }
