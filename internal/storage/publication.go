@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"nodi/internal/archive"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
@@ -73,7 +74,7 @@ func (g *GitHub) PublishFrom(ctx context.Context, m model.Manifest, name, source
 		return err
 	}
 	if j != nil {
-		if j.Operation.Source != source || !sameManifest(j.Operation.Manifest, m) {
+		if !publicationSourceMatches(j.Operation, source) || !sameManifest(j.Operation.Manifest, m) {
 			return fmt.Errorf("another unfinished publication owns this project; prepared operation retained")
 		}
 	} else {
@@ -118,7 +119,7 @@ func (g *GitHub) ResumePublish(ctx context.Context, project, source, status, ver
 		}
 	}
 	m := j.Operation.Manifest
-	if source != j.Operation.Source || m.Project != project || status != m.Status || version != "" && version != m.Version {
+	if !publicationSourceMatches(j.Operation, source) || m.Project != project || status != m.Status || version != "" && version != m.Version {
 		return nil, fmt.Errorf("retry does not match the unfinished publication identity or requested status/version")
 	}
 	if err = g.attemptPublication(ctx, j); err != nil {
@@ -160,7 +161,7 @@ func (g *GitHub) AcknowledgePublish(ctx context.Context, project, version, sourc
 			return err
 		}
 	}
-	if j.Operation.Source != source || j.Operation.Manifest.Project != project {
+	if !publicationSourceMatches(j.Operation, source) || j.Operation.Manifest.Project != project {
 		return fmt.Errorf("publication acknowledgement identity mismatch")
 	}
 	if j.State.Phase == "complete" {
@@ -177,6 +178,17 @@ func (g *GitHub) AcknowledgePublish(ctx context.Context, project, version, sourc
 		return err
 	}
 	return syncPublicationDirectory(j.dir)
+}
+
+func publicationSourceMatches(op publicationOperation, source string) bool {
+	if op.Source == "" || source == "" {
+		return op.Source == source
+	}
+	if op.SourceObject == "" {
+		return identity.Same(op.Source, source)
+	}
+	key, err := identity.Key(source)
+	return err == nil && key == op.SourceObject
 }
 
 func (j *publicationJournal) releaseBody() string {

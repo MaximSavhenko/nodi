@@ -1,12 +1,15 @@
 package local
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"nodi/internal/config"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -16,6 +19,7 @@ type Download struct {
 	Version      string    `json:"version"`
 	Path         string    `json:"path"`
 	DownloadedAt time.Time `json:"downloaded_at"`
+	Object       string    `json:"object,omitempty"`
 }
 
 func Record(repo string, m model.Manifest, path string) error {
@@ -28,12 +32,27 @@ func Record(repo string, m model.Manifest, path string) error {
 		return e
 	}
 	// One record per version/path avoids a shared mutable index or lost updates.
-	record := Download{repo, m.Project, m.Version, path, time.Now().UTC()}
+	if e := config.ValidateRepo(repo); e != nil {
+		return e
+	}
+	if e := model.ValidateProject(m.Project); e != nil {
+		return e
+	}
+	if e := model.ValidateVersion(m.Version); e != nil {
+		return e
+	}
+	repo = strings.ToLower(repo)
+	object, e := identity.Key(path)
+	if e != nil {
+		return e
+	}
+	record := Download{Repository: repo, Project: m.Project, Version: m.Version, Path: path, DownloadedAt: time.Now().UTC(), Object: object}
 	b, e := json.MarshalIndent(record, "", "  ")
 	if e != nil {
 		return e
 	}
-	return config.WritePrivate(filepath.Join(dir, "downloads", m.Project, m.Version+".json"), b)
+	key := fmt.Sprintf("%x", sha256.Sum256([]byte(repo+"\x00"+m.Version+"\x00"+object)))
+	return config.WritePrivate(filepath.Join(dir, "downloads", m.Project, key+".json"), b)
 }
 func Latest(repo, project string) (string, error) {
 	if e := model.ValidateProject(project); e != nil {
@@ -60,12 +79,18 @@ func Latest(repo, project string) (string, error) {
 		if e = json.Unmarshal(b, &d); e != nil {
 			return "", fmt.Errorf("invalid local download record")
 		}
-		if d.Repository != repo || d.Project != project || model.ValidateVersion(d.Version) != nil {
+		if !strings.EqualFold(d.Repository, repo) || d.Project != project || model.ValidateVersion(d.Version) != nil || !filepath.IsAbs(d.Path) {
 			continue
 		}
-		if d.DownloadedAt.After(latest.DownloadedAt) {
+		if d.DownloadedAt.After(latest.DownloadedAt) || d.DownloadedAt.Equal(latest.DownloadedAt) && d.Path < latest.Path {
 			st, e := os.Stat(d.Path)
 			if e == nil && st.IsDir() {
+				if d.Object != "" {
+					key, err := identity.Key(d.Path)
+					if err != nil || key != d.Object {
+						continue
+					}
+				}
 				latest = d
 			}
 		}

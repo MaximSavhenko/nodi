@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"nodi/internal/archive"
 	"nodi/internal/config"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"nodi/internal/project"
 	"os"
@@ -100,7 +101,8 @@ func (a *App) send(ctx context.Context, path string, o options) error {
 
 type sendReceipt struct {
 	Source, Repository, Name string
-	Pending                  bool `json:"pending,omitempty"`
+	Pending                  bool   `json:"pending,omitempty"`
+	Object                   string `json:"object,omitempty"`
 }
 
 func sendReceiptPath(source, repo string) (string, error) {
@@ -108,7 +110,11 @@ func sendReceiptPath(source, repo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	key := fmt.Sprintf("%x", sha256.Sum256([]byte(source+"\x00"+repo)))
+	object, err := identity.Key(source)
+	if err != nil {
+		return "", err
+	}
+	key := fmt.Sprintf("%x", sha256.Sum256([]byte(object+"\x00"+strings.ToLower(repo))))
 	return filepath.Join(dir, "sent", key+".json"), nil
 }
 func readSendReceipt(source, repo string) (*sendReceipt, error) {
@@ -118,13 +124,14 @@ func readSendReceipt(source, repo string) (*sendReceipt, error) {
 	}
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return readLegacySendReceipt(source, repo)
 	}
 	if err != nil {
 		return nil, err
 	}
 	var r sendReceipt
-	if json.Unmarshal(data, &r) != nil || r.Source != source || r.Repository != repo || model.ValidateProject(r.Name) != nil {
+	object, keyErr := identity.Key(source)
+	if json.Unmarshal(data, &r) != nil || keyErr != nil || r.Object != object || !strings.EqualFold(r.Repository, repo) || model.ValidateProject(r.Name) != nil {
 		return nil, fmt.Errorf("invalid local send identity; inspect %s", path)
 	}
 	return &r, nil
@@ -137,11 +144,80 @@ func savePendingSendReceipt(source, repo, name string, pending bool) error {
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(sendReceipt{Source: source, Repository: repo, Name: name, Pending: pending})
+	object, err := identity.Key(source)
 	if err != nil {
 		return err
 	}
-	return config.WritePrivate(path, data)
+	data, err := json.Marshal(sendReceipt{Source: source, Repository: strings.ToLower(repo), Name: name, Pending: pending, Object: object})
+	if err != nil {
+		return err
+	}
+	if err = config.WritePrivate(path, data); err != nil {
+		return err
+	}
+	// Stamp matching legacy records after the new record is durable, so an
+	// old path-keyed copy cannot later adopt a recreated source at that path.
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || entry.Name() == filepath.Base(path) {
+			continue
+		}
+		oldPath := filepath.Join(filepath.Dir(path), entry.Name())
+		oldData, err := os.ReadFile(oldPath)
+		if err != nil {
+			return err
+		}
+		var old sendReceipt
+		if json.Unmarshal(oldData, &old) != nil {
+			return fmt.Errorf("invalid legacy send receipt")
+		}
+		if old.Object == "" && old.Name == name && strings.EqualFold(old.Repository, repo) && identity.Same(old.Source, source) {
+			if err = config.WritePrivate(oldPath, data); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func readLegacySendReceipt(source, repo string) (*sendReceipt, error) {
+	dir, err := config.Dir()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, "sent"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var found *sendReceipt
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		path := filepath.Join(dir, "sent", entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		var r sendReceipt
+		if json.Unmarshal(data, &r) != nil {
+			return nil, fmt.Errorf("invalid local send identity; inspect %s", path)
+		}
+		if r.Object != "" || !strings.EqualFold(r.Repository, repo) || !identity.Same(r.Source, source) {
+			continue
+		}
+		if model.ValidateProject(r.Name) != nil || found != nil && (found.Name != r.Name || found.Pending != r.Pending) {
+			return nil, fmt.Errorf("conflicting legacy send identities")
+		}
+		found = &r
+	}
+	return found, nil
 }
 func nameConflict(name, source string) error {
 	return fmt.Errorf("name conflict: %s already exists and this source has no matching send identity; use nodi send %q --name unique-project; for an existing package you own, explicitly bind its whole directory with nodi init %s", name, source, name)
