@@ -205,7 +205,7 @@ const help = `Nodi — private file delivery via GitHub Releases
                                  Configure and verify separate read/write access
   nodi setup --completion [--check]
                                  Persistent completion (asks before profile edits)
-  nodi send PATH [--name PROJECT] [--dry-run]
+  nodi send PATH [--name PROJECT] [--include RELATIVE/FILE] [--dry-run]
                                  Independent file/directory; automatic version
   nodi delete PROJECT --version VERSION [--dry-run]
   nodi delete PROJECT --all [--dry-run]

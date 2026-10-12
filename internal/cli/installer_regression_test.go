@@ -100,6 +100,18 @@ func TestRegressionB10InstallerPreservesOldBinary(t *testing.T) {
 			if err == nil || readErr != nil || sha256.Sum256(afterData) != before {
 				t.Fatalf("installer must fail and preserve old binary (%s): err=%v read=%v\n%s", mode, err, readErr, output)
 			}
+			if runtime.GOOS == "windows" {
+				if shell, err := exec.LookPath("pwsh"); err == nil {
+					cmd7 := exec.Command(shell, cmd.Args[1:]...)
+					output, err := cmd7.CombinedOutput()
+					data, readErr := os.ReadFile(installed)
+					if err == nil || readErr != nil || sha256.Sum256(data) != before {
+						t.Fatalf("PowerShell 7 did not preserve old binary: %v %v\n%s", err, readErr, output)
+					}
+				} else {
+					t.Log("PowerShell 7 NOT VERIFIED on this host; CI supplies it")
+				}
+			}
 		})
 	}
 }

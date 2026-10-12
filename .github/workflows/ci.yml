@@ -31,7 +31,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
         run: |
-          $version = '0.4.1'
+          $version = '0.5.0'
           if ($env:REF_TYPE -eq 'tag') {
             if ($env:REF_NAME -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Only stable version tags can be released.' }
             $version = $env:REF_NAME.Substring(1)
@@ -40,7 +40,7 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
       - run: go vet ./...
-      - run: go test -cover ./...
+      - run: go test -count=1 -cover ./...
       - name: Build and generate distribution
         shell: pwsh
         run: |
@@ -79,7 +79,18 @@ jobs:
           go-version: '1.27.2'
           cache: false
       - run: go vet ./...
-      - run: go test -cover ./...
+      - run: go test -count=1 -cover ./...
+      - name: Verify distinct identities on case-sensitive APFS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_root="$(mktemp -d "$RUNNER_TEMP/nodi-apfs.XXXXXXXX")"
+          hdiutil create -size 256m -fs 'Case-sensitive APFS' -volname NodiCase -type SPARSEBUNDLE "$fixture_root/case.sparsebundle"
+          mkdir "$fixture_root/mount"
+          hdiutil attach -nobrowse -mountpoint "$fixture_root/mount" "$fixture_root/case.sparsebundle"
+          trap 'hdiutil detach "$fixture_root/mount"' EXIT
+          NODI_CASE_SENSITIVE_ROOT="$fixture_root/mount" go test -count=1 -v -run '^TestB05DistinctCaseObjects$' ./internal/cli
       - name: Race checks on macOS
         if: runner.os == 'macOS'
         run: go test -race ./...
@@ -105,6 +116,15 @@ jobs:
       - name: Upgrade macOS 0.3.0 and preserve user data
         if: runner.os == 'macOS'
         run: bash scripts/test-macos-upgrade.sh '${{ needs.build.outputs.version }}' "$PWD/dist"
+      - name: Upgrade Windows 0.4.1 and preserve user data
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          NODI_INSTALL_TOKEN: ${{ github.token }}
+        run: ./scripts/test-windows-upgrade.ps1 -Version '${{ needs.build.outputs.version }}' -OldVersion '0.4.1'
+      - name: Upgrade macOS 0.4.1 and preserve user data
+        if: runner.os == 'macOS'
+        run: bash scripts/test-macos-upgrade.sh '${{ needs.build.outputs.version }}' "$PWD/dist" 0.4.1
       - name: Test fresh PowerShell 5.1 and 7 startup with real profiles
         if: runner.os == 'Windows'
         shell: pwsh
