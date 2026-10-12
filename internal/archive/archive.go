@@ -158,6 +158,9 @@ func CheckParents(p string) error {
 }
 
 func Extract(ctx context.Context, name string, m model.Manifest, destination string) error {
+	return ExtractWithCommit(ctx, name, m, destination, nil)
+}
+func ExtractWithCommit(ctx context.Context, name string, m model.Manifest, destination string, beforeCommit func(string) error) error {
 	if e := m.Validate(); e != nil {
 		return e
 	}
@@ -240,6 +243,9 @@ func Extract(ctx context.Context, name string, m model.Manifest, destination str
 		}
 		h := sha256.New()
 		n, copyErr := io.Copy(io.MultiWriter(out, h), io.LimitReader(contextReader{ctx, r}, f.Size+1))
+		if copyErr == nil {
+			copyErr = out.Sync()
+		}
 		closeErr := out.Close()
 		r.Close()
 		if copyErr != nil {
@@ -252,29 +258,25 @@ func Extract(ctx context.Context, name string, m model.Manifest, destination str
 			return fmt.Errorf("file SHA-256 or size mismatch: %s", entry.Name)
 		}
 	}
-	// Exclusively reserve the destination; never rename over an existing folder.
-	if e = os.Mkdir(dest, 0755); e != nil {
-		return fmt.Errorf("destination already exists or cannot be created: %w", e)
-	}
-	success := false
-	defer func() {
-		if !success {
-			os.RemoveAll(dest)
-		}
-	}()
-	entries, e := os.ReadDir(stage)
-	if e != nil {
+	if e = ctx.Err(); e != nil {
 		return e
 	}
-	for _, entry := range entries {
-		if e = os.Rename(filepath.Join(stage, entry.Name()), filepath.Join(dest, entry.Name())); e != nil {
+	if e = CheckParents(parent); e != nil {
+		return e
+	}
+	if beforeCommit != nil {
+		if e = beforeCommit(stage); e != nil {
 			return e
 		}
 	}
-	success = true
+	if e = ctx.Err(); e != nil {
+		return e
+	}
+	if e = commitDirectory(stage, dest); e != nil {
+		return fmt.Errorf("atomic no-replace installation refused: %w", e)
+	}
 	return nil
 }
-
 func sourceNames(ctx context.Context, source string, requireFiles bool) (string, []string, error) {
 	return sourceNamesReport(ctx, source, requireFiles, nil)
 }

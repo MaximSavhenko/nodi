@@ -512,6 +512,18 @@ func (a *App) get(ctx context.Context, store storage.Store, o options) error {
 	if e != nil {
 		return e
 	}
+	c, e := config.Load()
+	if e != nil {
+		return e
+	}
+	recovered, e := local.Reconcile(ctx, c.Repository, m, dest)
+	if e != nil {
+		return e
+	}
+	if recovered {
+		fmt.Fprintf(a.Out, "Recovered download record for %s %s. Verified SHA-256.\nLocation: %s\n", m.Project, m.Version, dest)
+		return nil
+	}
 	if _, e = os.Lstat(dest); !os.IsNotExist(e) {
 		return fmt.Errorf("destination already exists or is inaccessible; choose another --output: %s", dest)
 	}
@@ -529,15 +541,8 @@ func (a *App) get(ctx context.Context, store storage.Store, o options) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	if e = archive.Extract(ctx, name, m, dest); e != nil {
+	if e = local.Install(ctx, c.Repository, m, name, dest); e != nil {
 		return e
-	}
-	c, e := config.Load()
-	if e != nil {
-		return fmt.Errorf("download verified at %s, but local record failed: %w", dest, e)
-	}
-	if e = local.Record(c.Repository, m, dest); e != nil {
-		return fmt.Errorf("download verified at %s, but local record failed: %w", dest, e)
 	}
 	fmt.Fprintf(a.Out, "Package: %s\nVersion: %s\nFiles: %d\nDownloaded successfully. Verified SHA-256.\nLocation: %s\n", m.Project, m.Version, len(m.Files), dest)
 	return nil
