@@ -21,6 +21,24 @@ func (a *App) binding() (project.Binding, error) {
 	}
 	return project.Find(cwd)
 }
+func resumeSelectedPublication(ctx context.Context, s storage.Store, o options, project, source string) (*model.Manifest, error) {
+	if selector, ok := s.(storage.PublicationSelector); ok {
+		return selector.ResumeSelectedPublish(ctx, project, source, o.status, o.version, o.includes)
+	}
+	if len(o.includes) != 0 {
+		return nil, fmt.Errorf("provider does not support persistent exact-file selection")
+	}
+	return s.(storage.PublicationResumer).ResumePublish(ctx, project, source, o.status, o.version)
+}
+func publishSelectedPublication(ctx context.Context, s storage.Store, o options, m model.Manifest, zip, source string) error {
+	if selector, ok := s.(storage.PublicationSelector); ok {
+		return selector.PublishSelectedFrom(ctx, m, zip, source, o.includes)
+	}
+	if len(o.includes) != 0 {
+		return fmt.Errorf("provider does not support persistent exact-file selection")
+	}
+	return s.(storage.PublicationResumer).PublishFrom(ctx, m, zip, source)
+}
 func (a *App) initProject(o options) error {
 	repo := o.repo
 	if repo == "" {
@@ -151,8 +169,8 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	if e != nil {
 		return e
 	}
-	if resumable, ok := s.(storage.PublicationResumer); ok {
-		m, err := resumable.ResumePublish(ctx, name, source, o.status, o.version)
+	if _, ok := s.(storage.PublicationResumer); ok {
+		m, err := resumeSelectedPublication(ctx, s, o, name, source)
 		if err != nil {
 			return err
 		}
@@ -202,7 +220,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 			return e
 		}
 	}
-	files, e := archive.Scan(ctx, source)
+	files, e := archive.ScanSelected(ctx, source, o.includes)
 	if e != nil {
 		return e
 	}
@@ -218,7 +236,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	if len(files) == 0 {
 		return fmt.Errorf("no transferable files remain; add ordinary files to the delivery folder and preview exclusions with nodi send %q --dry-run", source)
 	}
-	m, zip, e := archive.Prepare(ctx, source, name, next, o.status, desc, metadata)
+	m, zip, e := archive.PrepareSelected(ctx, source, name, next, o.status, desc, metadata, o.includes)
 	if e != nil {
 		return e
 	}
@@ -241,7 +259,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	if latest.Version != state.Version || (state.Manifest != nil && (latest.Manifest == nil || latest.Manifest.ArchiveSHA256 != state.Manifest.ArchiveSHA256 || latest.Manifest.Status != state.Manifest.Status)) {
 		return fmt.Errorf("version conflict: remote state changed during packaging; retry the operation")
 	}
-	after, e := archive.Scan(ctx, source)
+	after, e := archive.ScanSelected(ctx, source, o.includes)
 	if e != nil {
 		return e
 	}
@@ -258,7 +276,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 		}
 	}
 	fmt.Fprintln(a.Out, "Uploading...")
-	if resumable, ok := s.(storage.PublicationResumer); ok {
+	if _, ok := s.(storage.PublicationResumer); ok {
 		if b == nil {
 			receipt, err := readSendReceipt(source, repo)
 			if err != nil {
@@ -271,7 +289,7 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 				return fmt.Errorf("cannot retain pending send identity; nothing published: %w", e)
 			}
 		}
-		e = resumable.PublishFrom(ctx, m, zip, source)
+		e = publishSelectedPublication(ctx, s, o, m, zip, source)
 	} else {
 		e = s.Publish(ctx, m, zip)
 	}
@@ -292,8 +310,8 @@ func (a *App) completePublication(ctx context.Context, s storage.Store, m model.
 	} else if err := saveSendReceipt(source, repo, m.Project); err != nil {
 		return fmt.Errorf("remote publication succeeded, but local send identity was not saved; repeat the same command: %w", err)
 	}
-	if resumable, ok := s.(storage.PublicationResumer); ok {
-		return resumable.AcknowledgePublish(ctx, m.Project, m.Version, source)
+	if _, ok := s.(storage.PublicationResumer); ok {
+		return s.(storage.PublicationResumer).AcknowledgePublish(ctx, m.Project, m.Version, source)
 	}
 	return nil
 }

@@ -14,7 +14,10 @@ import (
 
 // Scan is read-only: the same path/format rules as Prepare, without creating ZIPs.
 func Scan(ctx context.Context, source string) ([]model.File, error) {
-	source, names, e := sourceNames(ctx, source, false)
+	return ScanSelected(ctx, source, nil)
+}
+func ScanSelected(ctx context.Context, source string, includes []string) ([]model.File, error) {
+	source, names, e := sourceNamesSelected(ctx, source, false, nil, includes)
 	if e != nil {
 		return nil, e
 	}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"nodi/internal/config"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
@@ -42,6 +43,9 @@ func HashFile(name string) (string, int64, error) {
 }
 
 func Prepare(ctx context.Context, source, project, version, status, description string, metadata map[string]string) (model.Manifest, string, error) {
+	return PrepareSelected(ctx, source, project, version, status, description, metadata, nil)
+}
+func PrepareSelected(ctx context.Context, source, project, version, status, description string, metadata map[string]string, includes []string) (model.Manifest, string, error) {
 	m := model.Manifest{Schema: 1, Project: project, Version: version, Status: status, Description: description, PublishedAt: time.Now().UTC(), Metadata: metadata}
 	if e := model.ValidateProject(project); e != nil {
 		return m, "", e
@@ -52,7 +56,7 @@ func Prepare(ctx context.Context, source, project, version, status, description 
 	if status != "draft" && status != "released" {
 		return m, "", fmt.Errorf("choose --status draft or --status released explicitly")
 	}
-	source, names, e := sourceNames(ctx, source, true)
+	source, names, e := sourceNamesSelected(ctx, source, true, nil, includes)
 	if e != nil {
 		return m, "", e
 	}
@@ -285,12 +289,18 @@ func sourceNames(ctx context.Context, source string, requireFiles bool) (string,
 type Excluded struct{ Path, Reason string }
 
 func Exclusions(ctx context.Context, source string) ([]Excluded, error) {
+	return ExclusionsSelected(ctx, source, nil)
+}
+func ExclusionsSelected(ctx context.Context, source string, includes []string) ([]Excluded, error) {
 	var excluded []Excluded
-	_, _, err := sourceNamesReport(ctx, source, false, &excluded)
+	_, _, err := sourceNamesSelected(ctx, source, false, &excluded, includes)
 	return excluded, err
 }
 
 func sourceNamesReport(ctx context.Context, source string, requireFiles bool, excluded *[]Excluded) (string, []string, error) {
+	return sourceNamesSelected(ctx, source, requireFiles, excluded, nil)
+}
+func sourceNamesSelected(ctx context.Context, source string, requireFiles bool, excluded *[]Excluded, includes []string) (string, []string, error) {
 	source, e := filepath.Abs(source)
 	if e != nil {
 		return "", nil, e
@@ -316,18 +326,47 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 	if protectedPath(source, configDir) {
 		return "", nil, fmt.Errorf("Nodi configuration and credentials cannot be sent")
 	}
-	if excludedName(filepath.Base(source)) {
+	base := strings.ToLower(filepath.Base(source))
+	if excludedName(filepath.Base(source)) && !(root.IsDir() && (base == "build" || base == "dist")) && !(!root.IsDir() && base == "config.json") {
 		return "", nil, fmt.Errorf("source is excluded by the file policy: %s", filepath.Base(source))
 	}
 	if !root.IsDir() {
 		name := filepath.Base(source)
-		if excludedName(name) {
+		for _, included := range includes {
+			if included != name {
+				return "", nil, fmt.Errorf("file source include must match its exact filename")
+			}
+		}
+		if excludedName(name) && strings.ToLower(name) != "config.json" {
 			return "", nil, fmt.Errorf("source is excluded by the file policy: %s", name)
 		}
 		if e = model.SafePath(name); e != nil {
 			return "", nil, e
 		}
 		return parent, []string{name}, nil
+	}
+	allow := map[string]bool{}
+	for _, name := range includes {
+		if e := model.SafePath(name); e != nil {
+			return "", nil, e
+		}
+		for i, part := range strings.Split(name, "/") {
+			if excludedName(part) && !(i == len(strings.Split(name, "/"))-1 && strings.ToLower(part) == "config.json") {
+				return "", nil, fmt.Errorf("include cannot bypass protected file policy: %s", name)
+			}
+		}
+		p := filepath.Join(source, filepath.FromSlash(name))
+		if protectedPath(p, configDir) {
+			return "", nil, fmt.Errorf("Nodi configuration cannot be included")
+		}
+		if e := CheckParents(filepath.Dir(p)); e != nil {
+			return "", nil, e
+		}
+		st, e := os.Lstat(p)
+		if e != nil || !st.Mode().IsRegular() {
+			return "", nil, fmt.Errorf("include must be an exact regular file: %s", name)
+		}
+		allow[name] = true
 	}
 	var names []string
 	e = filepath.WalkDir(source, func(p string, d fs.DirEntry, err error) error {
@@ -340,7 +379,12 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 		if p == source {
 			return nil
 		}
-		if excludedName(d.Name()) || protectedPath(p, configDir) {
+		rel, e := filepath.Rel(source, p)
+		if e != nil {
+			return e
+		}
+		rel = filepath.ToSlash(rel)
+		if excludedName(d.Name()) && !allow[rel] || protectedPath(p, configDir) {
 			if excluded != nil {
 				rel, _ := filepath.Rel(source, p)
 				reason := "credential, key or service-file policy"
@@ -370,15 +414,11 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("not a regular file: %s", p)
 		}
-		rel, e := filepath.Rel(source, p)
-		if e != nil {
-			return e
-		}
-		rel = filepath.ToSlash(rel)
 		if e = model.SafePath(rel); e != nil {
 			return e
 		}
 		names = append(names, rel)
+		delete(allow, rel)
 		if len(names) > model.MaxFiles {
 			return fmt.Errorf("too many files")
 		}
@@ -386,6 +426,9 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 	})
 	if e != nil {
 		return "", nil, e
+	}
+	if len(allow) != 0 {
+		return "", nil, fmt.Errorf("include spelling must match an exact selected relative path")
 	}
 	if len(names) == 0 && requireFiles {
 		return "", nil, fmt.Errorf("no transferable files after excluding hidden, credential and service files")
@@ -395,6 +438,16 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 }
 
 func protectedPath(path, dir string) bool {
+	// SameFile recognizes Windows case/short-name aliases without merging
+	// unrelated objects on a case-sensitive filesystem.
+	for p := path; ; p = filepath.Dir(p) {
+		if identity.Same(p, dir) {
+			return true
+		}
+		if filepath.Dir(p) == p {
+			break
+		}
+	}
 	rel, err := filepath.Rel(dir, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
