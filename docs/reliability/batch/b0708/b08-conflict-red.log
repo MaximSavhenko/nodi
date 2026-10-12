@@ -1,0 +1,6 @@
+=== RUN   TestRegressionB08ReservedHighWaterMark
+    state_regression_test.go:97: reservation was not identified as a version conflict version high-water mark could not be verified: latest version 9.0.0 has a reserved tag without a complete release; inspect GitHub before retrying
+--- FAIL: TestRegressionB08ReservedHighWaterMark (0.16s)
+FAIL
+FAIL	nodi/internal/storage	0.182s
+FAIL
