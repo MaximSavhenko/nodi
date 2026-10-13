@@ -1,0 +1,10 @@
+?   	nodi/cmd/nodi	[no test files]
+ok  	nodi/internal/archive	2.543s
+ok  	nodi/internal/cli	19.776s
+ok  	nodi/internal/config	0.037s
+?   	nodi/internal/identity	[no test files]
+ok  	nodi/internal/local	0.079s
+ok  	nodi/internal/model	0.026s
+ok  	nodi/internal/project	0.041s
+ok  	nodi/internal/storage	10.067s
+?   	nodi/internal/testutil	[no test files]

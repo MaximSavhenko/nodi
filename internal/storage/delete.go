@@ -36,7 +36,7 @@ func deletedTag(project, version string) string { return deletedPrefix + model.T
 func (g *GitHub) tagRef(ctx context.Context, tag string) (gitRef, error) {
 	var r gitRef
 	e := g.json(ctx, "GET", g.endpoint("/git/ref/tags/"+url.PathEscape(tag)), nil, &r)
-	if e == nil && (r.Ref != "refs/tags/"+tag || len(r.Object.SHA) != 40) {
+	if e == nil && (r.Ref != "refs/tags/"+tag || !gitSHA.MatchString(r.Object.SHA)) {
 		e = fmt.Errorf("tag identity is inconsistent: %s", tag)
 	}
 	return r, e
@@ -49,7 +49,7 @@ func (g *GitHub) tombstones(ctx context.Context, project string) (map[string]str
 	used := map[string]string{}
 	for _, r := range refs {
 		p, v, ok := model.ParseTag(strings.TrimPrefix(r.Ref, "refs/tags/"+deletedPrefix))
-		if !ok || p != project || len(r.Object.SHA) != 40 {
+		if !ok || p != project || !gitSHA.MatchString(r.Object.SHA) {
 			return nil, fmt.Errorf("invalid deletion history ref %s; inspect GitHub before publishing", r.Ref)
 		}
 		used[v] = r.Object.SHA
