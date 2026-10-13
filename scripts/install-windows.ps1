@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Remote')][ValidatePattern('^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$')][string]$Repository,
     [Parameter(Mandatory, ParameterSetName = 'Remote')][ValidatePattern('^v\d+\.\d+\.\d+$')][string]$Release,
     [string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Nodi\bin'),
+    [ValidatePattern('^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$')][string]$Version,
     [switch]$NoPath,
     [switch]$NoCompletion
 )
@@ -54,11 +55,57 @@ try {
     $expected = $matches[0].Substring(0, 64)
     $actual = (Get-FileHash -LiteralPath (Join-Path $temporary $assetName) -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -cne $expected) { throw 'SHA-256 mismatch; installation refused' }
+    function Test-NodiCandidate([string]$Path, [string]$ExpectedVersion) {
+        $bytes = [IO.File]::ReadAllBytes($Path)
+        if ($bytes.Length -lt 64 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw 'Expected a Windows PE executable' }
+        $offset = [BitConverter]::ToInt32($bytes, 60)
+        if ($offset -lt 64 -or $offset -gt $bytes.Length - 6 -or [BitConverter]::ToUInt32($bytes, $offset) -ne 17744 -or [BitConverter]::ToUInt16($bytes, $offset + 4) -ne 34404) { throw 'Expected a Windows amd64 executable' }
+        $reported = (& $Path version) -join "`n"
+        if ($LASTEXITCODE -ne 0 -or $reported -cnotmatch '^nodi ((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)) windows/amd64$') { throw 'Candidate binary failed version/platform check' }
+        $candidateVersion = $Matches[1]
+        if ($ExpectedVersion -and $candidateVersion -cne $ExpectedVersion) { throw 'Candidate version differs from requested version' }
+        return $candidateVersion
+    }
+    $expectedVersion = $Version
+    if ($PSCmdlet.ParameterSetName -eq 'Remote') {
+        if ($Version -and ('v' + $Version) -cne $Release) { throw 'Version and Release disagree' }
+        $expectedVersion = $Release.Substring(1)
+    }
+    $verifiedVersion = Test-NodiCandidate (Join-Path $temporary $assetName) $expectedVersion
     New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null
     $installed = Join-Path $InstallDirectory 'nodi.exe'
-    Copy-Item -LiteralPath (Join-Path $temporary $assetName) -Destination $installed -Force
-    & $installed version
-    if ($LASTEXITCODE -ne 0) { throw 'Installed binary failed version check' }
+    $lockPath = Join-Path $InstallDirectory '.nodi-install.lock'
+    $installLock = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    $transaction = Join-Path $InstallDirectory ('.nodi-update-' + [guid]::NewGuid().ToString('N'))
+    try {
+        New-Item -ItemType Directory -Path $transaction | Out-Null
+        $candidate = Join-Path $transaction 'candidate.exe'
+        $backup = Join-Path $transaction 'previous.exe'
+        Copy-Item -LiteralPath (Join-Path $temporary $assetName) -Destination $candidate
+        if ((Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Staged candidate checksum differs' }
+        $null = Test-NodiCandidate $candidate $verifiedVersion
+        $hadPrevious = Test-Path -LiteralPath $installed
+        $committed = $false
+        try {
+            if ($hadPrevious) { [IO.File]::Replace($candidate, $installed, $backup) }
+            else { [IO.File]::Move($candidate, $installed) }
+            $committed = $true
+            $null = Test-NodiCandidate $installed $verifiedVersion
+        } catch {
+            $failure = $_
+            if ($committed) {
+                try {
+                    if ($hadPrevious) { [IO.File]::Replace($backup, $installed, (Join-Path $transaction 'rejected.exe')) }
+                    else { [IO.File]::Move($installed, (Join-Path $transaction 'rejected.exe')) }
+                } catch { throw "Update failed; rollback failed. Previous binary retained at $backup. Inspect $transaction." }
+            }
+            throw $failure
+        }
+        # Keep the exact previous binary as a recoverable backup. Do not erase it
+        # in cleanup, including on process interruption or rollback failure.
+        Write-Output "Verified nodi $verifiedVersion windows/amd64"
+        if ($hadPrevious) { Write-Output "Previous binary backup: $backup" }
+    } finally { $installLock.Dispose() }
     if (-not $NoPath) {
         $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
         $parts = @($userPath -split ';' | Where-Object { $_ })
