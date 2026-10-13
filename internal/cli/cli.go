@@ -247,6 +247,13 @@ func (a *App) Run(ctx context.Context, args []string) error {
 	}
 	cmd := args[0]
 	rest := args[1:]
+	if usage, requested, err := commandHelp(cmd, rest); requested || err != nil {
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(a.Out, usage)
+		return err
+	}
 	if cmd == "__complete" {
 		if len(rest) == 1 && rest[0] == "--json" {
 			input := bufio.NewReader(io.LimitReader(a.In, 65536))
