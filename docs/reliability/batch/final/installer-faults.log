@@ -1,0 +1,10 @@
+=== RUN   TestB10InstallerCrashAndRollbackFailure
+=== RUN   TestB10InstallerCrashAndRollbackFailure/before
+=== RUN   TestB10InstallerCrashAndRollbackFailure/after
+=== RUN   TestB10InstallerCrashAndRollbackFailure/rollback
+--- PASS: TestB10InstallerCrashAndRollbackFailure (8.70s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/before (2.85s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/after (2.91s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/rollback (2.94s)
+PASS
+ok  	nodi/internal/cli	8.714s

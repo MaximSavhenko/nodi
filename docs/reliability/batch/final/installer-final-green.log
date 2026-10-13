@@ -1,0 +1,30 @@
+=== RUN   TestB10InstallerCrashAndRollbackFailure
+=== RUN   TestB10InstallerCrashAndRollbackFailure/before
+=== RUN   TestB10InstallerCrashAndRollbackFailure/after
+=== RUN   TestB10InstallerCrashAndRollbackFailure/rollback
+--- PASS: TestB10InstallerCrashAndRollbackFailure (9.41s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/before (2.66s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/after (3.71s)
+    --- PASS: TestB10InstallerCrashAndRollbackFailure/rollback (3.04s)
+=== RUN   TestRegressionB10InstallerPreservesOldBinary
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/exit7
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/invalid
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/wrong_platform
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/postcheck
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/locked
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+=== RUN   TestRegressionB10InstallerPreservesOldBinary/requested_version
+    installer_regression_test.go:119: PowerShell 7 NOT VERIFIED on this host; CI supplies it
+--- PASS: TestRegressionB10InstallerPreservesOldBinary (14.60s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/exit7 (2.43s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/invalid (2.41s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/wrong_platform (2.45s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/postcheck (2.50s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/locked (2.45s)
+    --- PASS: TestRegressionB10InstallerPreservesOldBinary/requested_version (2.37s)
+PASS
+ok  	nodi/internal/cli	24.027s

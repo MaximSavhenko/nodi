@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -88,6 +89,9 @@ func TestRegressionB10InstallerPreservesOldBinary(t *testing.T) {
 					cmd.Args = append(cmd.Args, "--version", "0.4.1")
 				}
 			}
+			if runtime.GOOS == "windows" {
+				cmd.Env = installerFixtureEnvironment(true)
+			}
 			if mode == "locked" {
 				lock, err := os.Open(installed)
 				if err != nil {
@@ -100,6 +104,47 @@ func TestRegressionB10InstallerPreservesOldBinary(t *testing.T) {
 			if err == nil || readErr != nil || sha256.Sum256(afterData) != before {
 				t.Fatalf("installer must fail and preserve old binary (%s): err=%v read=%v\n%s", mode, err, readErr, output)
 			}
+			assertInstallerFailureReason(t, mode, output)
+			if runtime.GOOS == "windows" {
+				if shell, err := exec.LookPath("pwsh"); err == nil {
+					cmd7 := exec.Command(shell, cmd.Args[1:]...)
+					cmd7.Env = installerFixtureEnvironment(true)
+					output, err := cmd7.CombinedOutput()
+					data, readErr := os.ReadFile(installed)
+					if err == nil || readErr != nil || sha256.Sum256(data) != before {
+						t.Fatalf("PowerShell 7 did not preserve old binary: %v %v\n%s", err, readErr, output)
+					}
+					assertInstallerFailureReason(t, mode, output)
+				} else {
+					t.Log("PowerShell 7 NOT VERIFIED on this host; CI supplies it")
+				}
+			}
 		})
+	}
+}
+
+func installerFixtureEnvironment(windows bool) []string {
+	var result []string
+	for _, e := range os.Environ() {
+		// A Windows PowerShell child must resolve its own module paths rather
+		// than inherit PowerShell 7's module configuration from the CI shell.
+		if windows && strings.HasPrefix(strings.ToUpper(e), "PSMODULEPATH=") {
+			continue
+		}
+		result = append(result, e)
+	}
+	return result
+}
+func assertInstallerFailureReason(t *testing.T, mode string, output []byte) {
+	t.Helper()
+	text := strings.ToLower(string(output))
+	if strings.Contains(text, "not recognized") || strings.Contains(text, "command not found") {
+		t.Fatalf("installer never reached the injected failure: %s", output)
+	}
+	if mode == "requested version" && !strings.Contains(text, "differs from requested version") {
+		t.Fatalf("requested version not checked: %s", output)
+	}
+	if runtime.GOOS == "windows" && mode != "locked" && mode != "requested version" && !strings.Contains(text, "version/platform check") {
+		t.Fatalf("injected candidate failure not reached: %s", output)
 	}
 }

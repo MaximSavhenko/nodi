@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.4.1',
+    [string]$Version = '0.5.0',
     [string]$Owner = 'MaximSavhenko',
     [string]$License = 'MIT',
     [string]$DistributionDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) 'dist'),

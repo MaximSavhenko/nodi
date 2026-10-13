@@ -1,4 +1,8 @@
-# Nodi CLI 0.4.1
+# Nodi CLI 0.5.0
+
+В 0.5.0 исправлены B01–B11: проверка полного snapshot перед удалением, journal-backed восстановление публикации и удаления, сохранение имени первого send, атомарная установка каталога, object identity для aliases, независимые download records, строгий latest и единый version preflight, видимые исключения и безопасный installer rollback. Обычный путь остаётся `nodi send PATH`; manifest schema 1 и SHA-256 совместимы с 0.4.1. [CHANGELOG](CHANGELOG.md), [единый отчёт и зависимости PR](docs/NODI-RELIABILITY-BATCH-02.md).
+
+Обычный `config.json` можно явно включить: `nodi send PATH --include config.json`. Перед отправкой проверьте `--dry-run`; retry восстановления сохраняет те же include/status/version flags. При сбое удаления повторите ту же точную команду и подтверждение. Installer сохраняет прежний executable в указанном backup path; активная установка на компьютере пользователя в ходе разработки не обновлялась.
 
 Nodi передаёт файлы и их версии между Windows и macOS через приватный репозиторий GitHub и его Releases. На компьютере получателя нужны только Nodi и доступ в интернет. CAD, Git, Go, VPN и домашний сервер не нужны.
 
@@ -173,14 +177,14 @@ nodi version
 
 Установка: `~/.local/bin/nodi`. В интерактивном терминале установщик предлагает `setup --completion`; изменение `.zshrc` требует отдельного согласия. Без терминального stdin выполняется только `setup --completion --check` и выводится инструкция; `--no-completion` пропускает этот шаг. Для текущего терминала используйте `export PATH` выше. Явный `--add-path` по-прежнему разрешает добавление PATH в `~/.zprofile`. На Mac применяются обычные правила Gatekeeper; установщик не снимает quarantine, не отключает защиту и не подписывает программу.
 
-Установка или обновление до версии 0.4.1:
+Установка или обновление до версии 0.5.0:
 
 ```powershell
-.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.4.1
+.\scripts\install-windows.ps1 -Repository MaximSavhenko/nodi -Release v0.5.0
 ```
 
 ```sh
-sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.4.1
+sh scripts/install-macos.sh --repo MaximSavhenko/nodi --release v0.5.0
 ```
 
 Windows поддерживает приватный релиз CLI через переменную `NODI_INSTALL_TOKEN`; macOS сетевой режим рассчитан на публичный доверенный релиз, для приватной поставки используйте локальный комплект. Токены никогда не передаются аргументом команды. Контрольная сумма из того же доверенного релиза проверяет целостность; отдельной криптографической подписи поставки в v0.1 нет.

@@ -88,11 +88,22 @@ func TestB05LegacyAndRecreatedSource(t *testing.T) {
 
 func TestB05DistinctCaseObjects(t *testing.T) {
 	root := t.TempDir()
+	if parent := os.Getenv("NODI_CASE_SENSITIVE_ROOT"); parent != "" {
+		var err error
+		root, err = os.MkdirTemp(parent, "nodi-case-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(root) })
+	}
 	a := filepath.Join(root, "case.txt")
 	b := filepath.Join(root, "CASE.txt")
 	os.WriteFile(a, []byte("a"), 0644)
 	os.WriteFile(b, []byte("b"), 0644)
 	if identity.Same(a, b) {
+		if os.Getenv("NODI_CASE_SENSITIVE_ROOT") != "" {
+			t.Fatal("required case-sensitive fixture is case insensitive")
+		}
 		t.Skip("filesystem is case insensitive; case-sensitive negative case NOT VERIFIED")
 	}
 	ka, err := identity.Key(a)
