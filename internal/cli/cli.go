@@ -55,6 +55,7 @@ func New(version string, in io.Reader, out io.Writer) *App {
 }
 
 type options struct {
+	includes                                                   stringList
 	version, output, status, description, metadata, repo, name string
 	dryRun, check                                              bool
 	ownsName                                                   bool
@@ -62,6 +63,10 @@ type options struct {
 	draft                                                      bool
 	args                                                       []string
 }
+type stringList []string
+
+func (s *stringList) String() string         { return strings.Join(*s, ",") }
+func (s *stringList) Set(value string) error { *s = append(*s, value); return nil }
 
 func parse(command string, args []string) (options, error) {
 	var o options
@@ -72,6 +77,7 @@ func parse(command string, args []string) (options, error) {
 		fs.StringVar(&o.version, "version", "", "version")
 		fs.StringVar(&o.output, "output", "", "destination")
 	case "publish":
+		fs.Var(&o.includes, "include", "exact relative ordinary file path (repeatable)")
 		fs.StringVar(&o.version, "version", "", "version")
 		fs.StringVar(&o.status, "status", "", "draft or released")
 		fs.StringVar(&o.description, "description", "", "description")
@@ -80,6 +86,7 @@ func parse(command string, args []string) (options, error) {
 		fs.BoolVar(&o.major, "major", false, "increment major version")
 		fs.BoolVar(&o.draft, "draft", false, "create an unpublished draft")
 	case "send":
+		fs.Var(&o.includes, "include", "exact relative ordinary file path (repeatable)")
 		fs.StringVar(&o.name, "name", "", "independent package name")
 		fs.BoolVar(&o.dryRun, "dry-run", false, "read-only preview")
 	case "delete":
@@ -454,7 +461,7 @@ func (a *App) publish(ctx context.Context, o options) error {
 		return e
 	}
 	if resumable, ok := store.(storage.PublicationResumer); ok {
-		m, err := resumable.ResumePublish(ctx, o.args[0], o.args[1], o.status, o.version)
+		m, err := resumeSelectedPublication(ctx, store, o, o.args[0], o.args[1])
 		if err != nil {
 			return err
 		}
@@ -484,14 +491,14 @@ func (a *App) publish(ctx context.Context, o options) error {
 			return fmt.Errorf("metadata must be a JSON object of string values")
 		}
 	}
-	m, name, e := archive.Prepare(ctx, o.args[1], o.args[0], o.version, o.status, o.description, metadata)
+	m, name, e := archive.PrepareSelected(ctx, o.args[1], o.args[0], o.version, o.status, o.description, metadata, o.includes)
 	if e != nil {
 		return e
 	}
 	defer os.Remove(name)
 	fmt.Fprintf(a.Out, "Publishing %s %s: %d files, %d bytes, status %s\n", m.Project, m.Version, len(m.Files), m.ArchiveSize, m.Status)
-	if resumable, ok := store.(storage.PublicationResumer); ok {
-		e = resumable.PublishFrom(ctx, m, name, o.args[1])
+	if _, ok := store.(storage.PublicationResumer); ok {
+		e = publishSelectedPublication(ctx, store, o, m, name, o.args[1])
 	} else {
 		e = store.Publish(ctx, m, name)
 	}

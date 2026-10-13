@@ -27,6 +27,7 @@ type publicationOperation struct {
 	RepositoryID int64          `json:"repository_id"`
 	Source       string         `json:"source"`
 	SourceObject string         `json:"source_object,omitempty"`
+	Includes     []string       `json:"includes,omitempty"`
 	Manifest     model.Manifest `json:"manifest"`
 }
 
@@ -278,7 +279,7 @@ func (j *publicationJournal) checkpoint(phase string) error {
 	return writePublicationRecord(filepath.Join(j.dir, fmt.Sprintf("%06d.json", j.State.Sequence)), j.State)
 }
 
-func (g *GitHub) newPublication(root, source, name string, m model.Manifest, repoID int64) (*publicationJournal, error) {
+func (g *GitHub) newPublication(root, source, name string, m model.Manifest, repoID int64, includes ...[]string) (*publicationJournal, error) {
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return nil, err
@@ -312,6 +313,9 @@ func (g *GitHub) newPublication(root, source, name string, m model.Manifest, rep
 		return nil, err
 	}
 	j := &publicationJournal{dir: dir, Operation: publicationOperation{Schema: 1, ID: hex.EncodeToString(id[:]), Repository: strings.ToLower(g.repo), Endpoint: g.base, RepositoryID: repoID, Source: source, Manifest: m}}
+	if len(includes) != 0 {
+		j.Operation.Includes = append([]string(nil), includes[0]...)
+	}
 	if source != "" {
 		j.Operation.SourceObject, err = identity.Key(source)
 		if err != nil {

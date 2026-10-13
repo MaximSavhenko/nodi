@@ -147,12 +147,12 @@ func (a *App) remoteSuggestions(ctx context.Context, write, useBinding bool) []s
 }
 
 var commandFlags = map[string][]string{
-	"send": {"--name", "--dry-run"}, "delete": {"--version", "--all", "--dry-run"}, "update": {"--check"},
+	"send": {"--include", "--name", "--dry-run"}, "delete": {"--version", "--all", "--dry-run"}, "update": {"--check"},
 	"setup": {"--check", "--repo", "--write", "--completion"},
-	"get":   {"--version", "--output"}, "publish": {"--version", "--status", "--draft", "--description", "--metadata", "--minor", "--major"},
+	"get":   {"--version", "--output"}, "publish": {"--include", "--version", "--status", "--draft", "--description", "--metadata", "--minor", "--major"},
 	"list": {"--all"}, "info": {"--all"}, "config": {"--repo"}, "init": {"--repo"}, "auth": {"--write"},
 }
-var valueFlags = map[string]bool{"--version": true, "--output": true, "--status": true, "--description": true, "--metadata": true, "--repo": true, "--name": true}
+var valueFlags = map[string]bool{"--include": true, "--version": true, "--output": true, "--status": true, "--description": true, "--metadata": true, "--repo": true, "--name": true}
 
 func (a *App) complete(ctx context.Context, words []string) {
 	// This internal protocol always exits successfully and only emits validated candidates.
@@ -216,7 +216,7 @@ func (a *App) complete(ctx context.Context, words []string) {
 	}
 	if pending != "" {
 		switch pending {
-		case "--output", "--metadata":
+		case "--output", "--metadata", "--include":
 			fmt.Fprintln(a.Out, ":files")
 		case "--status":
 			emit([]string{equalPrefix + "draft", equalPrefix + "released"}, cur)

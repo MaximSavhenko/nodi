@@ -96,6 +96,14 @@ func (a *App) send(ctx context.Context, path string, o options) error {
 	if o.dryRun {
 		return a.previewSend(ctx, source, name, repo, binding, o)
 	}
+	excluded, err := archive.ExclusionsSelected(ctx, source, o.includes)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(a.Out, "Excluded: %d\n", len(excluded))
+	for _, f := range excluded {
+		fmt.Fprintf(a.Out, "  %s: %s\n", cleanText(f.Path), f.Reason)
+	}
 	return a.publishSource(ctx, o, source, name, repo, binding)
 }
 
@@ -223,11 +231,11 @@ func nameConflict(name, source string) error {
 	return fmt.Errorf("name conflict: %s already exists and this source has no matching send identity; use nodi send %q --name unique-project; for an existing package you own, explicitly bind its whole directory with nodi init %s", name, source, name)
 }
 func (a *App) previewSend(ctx context.Context, source, name, repo string, binding *project.Binding, o options) error {
-	files, err := archive.Scan(ctx, source)
+	files, err := archive.ScanSelected(ctx, source, o.includes)
 	if err != nil {
 		return err
 	}
-	excluded, err := archive.Exclusions(ctx, source)
+	excluded, err := archive.ExclusionsSelected(ctx, source, o.includes)
 	if err != nil {
 		return err
 	}

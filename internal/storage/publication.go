@@ -14,6 +14,8 @@ import (
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 )
 
 // PublicationResumer is the narrow capability needed to retain a prepared
@@ -22,6 +24,10 @@ type PublicationResumer interface {
 	PublishFrom(context.Context, model.Manifest, string, string) error
 	ResumePublish(context.Context, string, string, string, string) (*model.Manifest, error)
 	AcknowledgePublish(context.Context, string, string, string) error
+}
+type PublicationSelector interface {
+	PublishSelectedFrom(context.Context, model.Manifest, string, string, []string) error
+	ResumeSelectedPublish(context.Context, string, string, string, string, []string) (*model.Manifest, error)
 }
 
 type publicationRepository struct {
@@ -47,6 +53,12 @@ func (g *GitHub) Publish(ctx context.Context, m model.Manifest, name string) err
 }
 
 func (g *GitHub) PublishFrom(ctx context.Context, m model.Manifest, name, source string) error {
+	return g.PublishSelectedFrom(ctx, m, name, source, nil)
+}
+func (g *GitHub) PublishSelectedFrom(ctx context.Context, m model.Manifest, name, source string, includes []string) error {
+	includes = append([]string(nil), includes...)
+	sort.Strings(includes)
+	includes = slices.Compact(includes)
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -74,7 +86,7 @@ func (g *GitHub) PublishFrom(ctx context.Context, m model.Manifest, name, source
 		return err
 	}
 	if j != nil {
-		if !publicationSourceMatches(j.Operation, source) || !sameManifest(j.Operation.Manifest, m) {
+		if !publicationSourceMatches(j.Operation, source) || !slices.Equal(j.Operation.Includes, includes) || !sameManifest(j.Operation.Manifest, m) {
 			return fmt.Errorf("another unfinished publication owns this project; prepared operation retained")
 		}
 	} else {
@@ -85,7 +97,7 @@ func (g *GitHub) PublishFrom(ctx context.Context, m model.Manifest, name, source
 		if err != nil {
 			return err
 		}
-		j, err = g.newPublication(root, source, name, m, repo.ID)
+		j, err = g.newPublication(root, source, name, m, repo.ID, includes)
 		if err != nil {
 			return fmt.Errorf("cannot durably prepare publication; no remote mutation: %w", err)
 		}
@@ -94,6 +106,12 @@ func (g *GitHub) PublishFrom(ctx context.Context, m model.Manifest, name, source
 }
 
 func (g *GitHub) ResumePublish(ctx context.Context, project, source, status, version string) (*model.Manifest, error) {
+	return g.ResumeSelectedPublish(ctx, project, source, status, version, nil)
+}
+func (g *GitHub) ResumeSelectedPublish(ctx context.Context, project, source, status, version string, includes []string) (*model.Manifest, error) {
+	includes = append([]string(nil), includes...)
+	sort.Strings(includes)
+	includes = slices.Compact(includes)
 	root, err := g.publicationRoot(project)
 	if err != nil {
 		return nil, err
@@ -119,7 +137,7 @@ func (g *GitHub) ResumePublish(ctx context.Context, project, source, status, ver
 		}
 	}
 	m := j.Operation.Manifest
-	if !publicationSourceMatches(j.Operation, source) || m.Project != project || status != m.Status || version != "" && version != m.Version {
+	if !publicationSourceMatches(j.Operation, source) || !slices.Equal(j.Operation.Includes, includes) || m.Project != project || status != m.Status || version != "" && version != m.Version {
 		return nil, fmt.Errorf("retry does not match the unfinished publication identity or requested status/version")
 	}
 	if err = g.attemptPublication(ctx, j); err != nil {
@@ -377,7 +395,7 @@ func (g *GitHub) continuePublication(ctx context.Context, j *publicationJournal)
 		return fmt.Errorf("prepared archive checksum mismatch; publication retained")
 	}
 	if j.Operation.Source != "" {
-		files, err := archive.Scan(ctx, j.Operation.Source)
+		files, err := archive.ScanSelected(ctx, j.Operation.Source, j.Operation.Includes)
 		if err != nil {
 			return err
 		}
