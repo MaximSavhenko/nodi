@@ -47,6 +47,12 @@ jobs:
           ./scripts/build.ps1 -Version '${{ steps.version.outputs.version }}'
           ./scripts/generate-distribution.ps1 -Version '${{ steps.version.outputs.version }}' -Owner '${{ github.repository_owner }}' -License MIT
           ./scripts/verify-distribution.ps1 -Version '${{ steps.version.outputs.version }}' -Platform windows-amd64
+          $packagingPaths = @('packaging/homebrew/Formula/nodi.rb', 'packaging/winget/manifests/m/${{ github.repository_owner }}/Nodi/${{ steps.version.outputs.version }}')
+          $drift = @(git status --porcelain -- $packagingPaths)
+          if ($LASTEXITCODE -ne 0 -or $drift.Count -ne 0) {
+            $drift | Write-Output
+            throw 'Committed packaging differs from this build. Regenerate distribution metadata before committing.'
+          }
       - name: Validate winget manifests
         shell: pwsh
         run: |
