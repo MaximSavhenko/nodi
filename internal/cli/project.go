@@ -259,6 +259,18 @@ func (a *App) publishSource(ctx context.Context, o options, source, name, repo s
 	}
 	fmt.Fprintln(a.Out, "Uploading...")
 	if resumable, ok := s.(storage.PublicationResumer); ok {
+		if b == nil {
+			receipt, err := readSendReceipt(source, repo)
+			if err != nil {
+				return err
+			}
+			if receipt == nil {
+				e = savePendingSendReceipt(source, repo, name, true)
+			}
+			if e != nil {
+				return fmt.Errorf("cannot retain pending send identity; nothing published: %w", e)
+			}
+		}
 		e = resumable.PublishFrom(ctx, m, zip, source)
 	} else {
 		e = s.Publish(ctx, m, zip)

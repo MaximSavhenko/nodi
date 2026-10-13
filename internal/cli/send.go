@@ -86,7 +86,7 @@ func (a *App) send(ctx context.Context, path string, o options) error {
 				return fmt.Errorf("source was sent as %s; changing --name would change its identity; choose a separate delivery folder", receipt.Name)
 			}
 			name = receipt.Name
-			o.ownsName = true
+			o.ownsName = !receipt.Pending
 		}
 		if ancestor != nil && ancestor.Config.Repository == repo && ancestor.Config.Project == name {
 			return fmt.Errorf("nested directory name %s matches its parent project; use nodi send %q --name unique-project to send it independently, or nodi send %q for the whole parent", name, source, ancestor.Root)
@@ -98,7 +98,10 @@ func (a *App) send(ctx context.Context, path string, o options) error {
 	return a.publishSource(ctx, o, source, name, repo, binding)
 }
 
-type sendReceipt struct{ Source, Repository, Name string }
+type sendReceipt struct {
+	Source, Repository, Name string
+	Pending                  bool `json:"pending,omitempty"`
+}
 
 func sendReceiptPath(source, repo string) (string, error) {
 	dir, err := config.Dir()
@@ -127,11 +130,14 @@ func readSendReceipt(source, repo string) (*sendReceipt, error) {
 	return &r, nil
 }
 func saveSendReceipt(source, repo, name string) error {
+	return savePendingSendReceipt(source, repo, name, false)
+}
+func savePendingSendReceipt(source, repo, name string, pending bool) error {
 	path, err := sendReceiptPath(source, repo)
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(sendReceipt{source, repo, name})
+	data, err := json.Marshal(sendReceipt{Source: source, Repository: repo, Name: name, Pending: pending})
 	if err != nil {
 		return err
 	}
