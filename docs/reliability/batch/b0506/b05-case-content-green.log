@@ -1,0 +1,4 @@
+=== RUN   TestRegressionB05WindowsPathCase
+--- PASS: TestRegressionB05WindowsPathCase (0.08s)
+PASS
+ok  	nodi/internal/cli	0.109s

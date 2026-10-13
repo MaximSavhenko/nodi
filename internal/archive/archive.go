@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"nodi/internal/config"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
@@ -321,6 +322,24 @@ func sourceNamesReport(ctx context.Context, source string, requireFiles bool, ex
 	}
 	if !root.IsDir() {
 		name := filepath.Base(source)
+		// An input case alias must not rename the ZIP entry or allocate another
+		// version. Resolve the spelling from the actual directory entry, and
+		// verify SameFile instead of folding distinct case-sensitive objects.
+		entries, err := os.ReadDir(parent)
+		if err != nil {
+			return "", nil, err
+		}
+		canonical := name
+		for _, entry := range entries {
+			if entry.Name() == name {
+				canonical = name
+				break
+			}
+			if strings.EqualFold(entry.Name(), name) && identity.Same(source, filepath.Join(parent, entry.Name())) {
+				canonical = entry.Name()
+			}
+		}
+		name = canonical
 		if excludedName(name) {
 			return "", nil, fmt.Errorf("source is excluded by the file policy: %s", name)
 		}

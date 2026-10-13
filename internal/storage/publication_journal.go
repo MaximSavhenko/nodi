@@ -10,6 +10,7 @@ import (
 	"io"
 	"nodi/internal/archive"
 	"nodi/internal/config"
+	"nodi/internal/identity"
 	"nodi/internal/model"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ type publicationOperation struct {
 	Endpoint     string         `json:"endpoint"`
 	RepositoryID int64          `json:"repository_id"`
 	Source       string         `json:"source"`
+	SourceObject string         `json:"source_object,omitempty"`
 	Manifest     model.Manifest `json:"manifest"`
 }
 
@@ -310,6 +312,12 @@ func (g *GitHub) newPublication(root, source, name string, m model.Manifest, rep
 		return nil, err
 	}
 	j := &publicationJournal{dir: dir, Operation: publicationOperation{Schema: 1, ID: hex.EncodeToString(id[:]), Repository: strings.ToLower(g.repo), Endpoint: g.base, RepositoryID: repoID, Source: source, Manifest: m}}
+	if source != "" {
+		j.Operation.SourceObject, err = identity.Key(source)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err = writePublicationRecord(filepath.Join(dir, "operation.json"), j.Operation); err != nil {
 		return nil, err
 	}
